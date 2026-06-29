@@ -1,0 +1,34 @@
+name: checkout-flow
+mode: declarative
+
+personas:
+  - type: new_customer
+    weight: 0.4
+    attributes:
+      cart_size: { min: 1, max: 5 }
+      payment_method: card
+  - type: returning_customer
+    weight: 0.45
+    attributes:
+      cart_size: { min: 1, max: 12 }
+      payment_method: [card, paypal, saved_card]
+      has_coupon: { probability: 0.3 }
+  - type: expired_card_with_coupon
+    weight: 0.05
+    attributes:
+      payment_method: card
+      card_status: expired
+      has_coupon: { probability: 1.0 }
+  - type: high_value_cart
+    weight: 0.1
+    attributes:
+      cart_size: { min: 10, max: 50 }
+      total_value: { min: 500, max: 5000 }
+
+sessions: 12000
+concurrency: 50
+
+assertions:
+  - "no session results in a 500-level error"
+  - "no session writes to orders without a corresponding payment record"
+  - "expired_card_with_coupon sessions surface a clear error message"

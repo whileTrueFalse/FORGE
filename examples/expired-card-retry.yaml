@@ -1,0 +1,21 @@
+name: expired-card-retry
+mode: scripted
+
+steps:
+  - action: add_to_cart
+    params: { product_id: "sku_1029", quantity: 2 }
+  - action: apply_coupon
+    params: { code: "SAVE10" }
+  - action: enter_payment
+    params: { card_status: "expired" }
+  - action: submit_checkout
+    expect:
+      status: error
+      error_code: "CARD_EXPIRED"
+  - action: enter_payment
+    params: { card_status: "valid" }
+  - action: submit_checkout
+    expect:
+      status: success
+
+repeat: 500

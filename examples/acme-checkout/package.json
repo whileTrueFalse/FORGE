@@ -1,0 +1,13 @@
+{
+  "name": "acme-checkout",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Sample target app for Forge real-run interception (Express-shaped checkout API).",
+  "scripts": {
+    "start": "node src/server.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.13.0"
+  }
+}
