@@ -17,18 +17,21 @@ export function getSteps(): Step[] {
   const c = loadForgeYaml();
   const state = loadState();
   const runs = listRuns();
+  // If a target app is configured, guide the user to the real engine.
+  const runCmd = c?.target ? "forge run --real" : "forge run";
   return [
     { label: "project", done: Boolean(c), next: "forge init <name>" },
     { label: "database", done: Boolean(c && c.data.databases.length > 0), next: "forge db link" },
     { label: "mocks", done: Boolean(c && c.data.mocks.length > 0), next: "forge mock add" },
     { label: "simulation", done: Boolean(c && c.simulations.length > 0), next: "forge sim add" },
     { label: "agent", done: Boolean(c && c.agents.length > 0 && state.attachedAgent), next: "forge attach" },
-    { label: "run", done: runs.length > 0, next: "forge run" },
+    { label: "run", done: runs.length > 0, next: runCmd },
   ];
 }
 
 export function Checklist({ steps }: { steps: Step[] }): React.JSX.Element {
   const next = steps.find((s) => !s.done);
+  const runCmd = steps.find((s) => s.label === "run")?.next ?? "forge run";
   return (
     <Box flexDirection="column">
       {steps.map((s) => (
@@ -43,7 +46,7 @@ export function Checklist({ steps }: { steps: Step[] }): React.JSX.Element {
             <Text color={theme.key}>{next.next}</Text>
           </Box>
         ) : (
-          <Text color={theme.pass}>✓ ready — forge run</Text>
+          <Text color={theme.pass}>✓ ready — {runCmd}</Text>
         )}
       </Box>
     </Box>

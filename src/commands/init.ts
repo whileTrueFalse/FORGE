@@ -3,6 +3,7 @@
 import readline from "node:readline/promises";
 import * as ui from "../core/ui.js";
 import { forgeYamlExists, saveForgeYaml, ensureForgeDirs } from "../core/store.js";
+import { detectProject } from "../core/detect.js";
 import type { ForgeConfig, PolicyPreset } from "../types.js";
 
 interface InitOptions {
@@ -80,12 +81,18 @@ export async function init(options: InitOptions): Promise<void> {
     },
   };
 
+  // Auto-configure a real-run target from the project we're initialized in.
+  const detected = detectProject(process.cwd());
+  if (detected.target) config.target = detected.target;
+
   ensureForgeDirs();
   saveForgeYaml(config);
 
   console.log();
   ui.ok("forge.yaml created");
   ui.ok(".forge/ directory scaffolded");
+  if (detected.target) ui.ok(detected.note);
+  else ui.dim(`  ${detected.note}`);
   console.log();
   ui.dim(`  (stack noted: ${stack})`);
   console.log();

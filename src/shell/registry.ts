@@ -30,6 +30,7 @@ import {
 } from "../core/simDb.js";
 import { getPreset, listPresets } from "../core/mockApi.js";
 import { summarizeDiffs } from "../core/diffFormat.js";
+import { detectProject } from "../core/detect.js";
 import type {
   ForgeConfig,
   DbSchema,
@@ -170,12 +171,15 @@ export const COMMANDS: Command[] = [
       if (forgeYamlExists() && !flags.force) return err("forge.yaml already exists", "add --force to overwrite");
       const name = positionals[0] ?? (typeof flags.name === "string" ? flags.name : "my-project");
       const preset = normalizePreset(typeof flags.policy === "string" ? flags.policy : "default");
+      const config = defaultConfig(name, preset);
+      const detected = detectProject(process.cwd());
+      if (detected.target) config.target = detected.target;
       ensureForgeDirs();
-      saveForgeYaml(defaultConfig(name, preset));
-      return ok(
-        { text: `✓ project "${name}" created · policy ${preset}`, tone: "ok" },
-        { text: "next: forge db link  ·  forge mock add  ·  forge attach", tone: "dim" }
-      );
+      saveForgeYaml(config);
+      const lines: OutLine[] = [{ text: `✓ project "${name}" created · policy ${preset}`, tone: "ok" }];
+      if (detected.target) lines.push({ text: `✓ ${detected.note}`, tone: "ok" });
+      lines.push({ text: "next: forge db link  ·  forge mock add  ·  forge attach", tone: "dim" });
+      return { ok: true, lines };
     },
   },
   {
