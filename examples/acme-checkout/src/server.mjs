@@ -55,7 +55,7 @@ function chargeCard(cardStatus) {
 }
 
 const server = http.createServer(async (req, res) => {
-  const sid = req.headers["x-session"] || "anon";
+  const sid = req.headers["x-session"] || "00000000-0000-0000-0000-000000000001";
   const body = await readJson(req);
 
   try {

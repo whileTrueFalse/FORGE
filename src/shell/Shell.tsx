@@ -28,7 +28,6 @@ import { loadForgeYaml, loadState, listRuns, nextRunId, saveRun, saveDiffPatch }
 import { buildPatchText } from "../core/diffFormat.js";
 import { RunEngine, type RunSource } from "../core/runEngine.js";
 import { RealRunEngine } from "../engine/realRun.js";
-import { dockerAvailable } from "../engine/backends/postgres.js";
 import type { ForgeConfig, RunRecord } from "../types.js";
 
 type NewEntry =
@@ -191,14 +190,9 @@ export function Shell(): React.JSX.Element {
     if (config.agents.length === 0) {
       return pushResult("forge run --real", [{ text: "✗ no agent attached — forge attach <agent> --scope <glob>", tone: "err" }], false);
     }
-    if (!(await dockerAvailable())) {
-      return pushResult("forge run --real", [
-        { text: "✗ Docker not available — required for the real sandbox database", tone: "err" },
-        { text: "  start Docker, or run the scripted sandbox: forge run", tone: "dim" },
-      ], false);
-    }
     const runId = nextRunId();
-    const engine = new RealRunEngine({ runId, task, config, sampleCap: 50 });
+    // Default to the in-process pglite backend — no Docker required.
+    const engine = new RealRunEngine({ runId, task, config, dbBackend: "pglite", sampleCap: 50 });
     engine.once("done", (outcome: unknown) => {
       const o = outcome as { record: RunRecord };
       saveRun(o.record);

@@ -43,9 +43,11 @@ function pgValue(t: string): string {
   }
 }
 
-/** Build DDL + synthetic-row INSERTs for the schema. Pure — unit-testable. */
+/** Build DDL + synthetic-row INSERTs for the schema. Pure — unit-testable.
+ *  Uses only core Postgres (gen_random_uuid is core since PG 13), so the same
+ *  SQL seeds both the Docker backend and the in-process pglite backend. */
 export function buildSeedSql(schema: DbSchema, rowsPerTable = 250): string {
-  const parts: string[] = ['CREATE EXTENSION IF NOT EXISTS "pgcrypto";'];
+  const parts: string[] = [];
   for (const t of schema.tables) {
     const cols = t.columns.map((c) => `${c.name} ${pgType(c.type)}`).join(", ");
     parts.push(`CREATE TABLE IF NOT EXISTS ${t.name} (${cols});`);

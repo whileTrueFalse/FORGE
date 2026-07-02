@@ -16,6 +16,7 @@ import { resolvePolicyRules } from "../core/policyEngine.js";
 import { loadSimFile } from "../core/store.js";
 import { generateSchema } from "../core/simDb.js";
 import { startPostgres } from "./backends/postgres.js";
+import { startPglite } from "./backends/pglite.js";
 import { startMockServer } from "./backends/mockServer.js";
 import { createFsSandbox } from "./backends/fsSandbox.js";
 import { driveSim as realDriveSim } from "./driver/simDriver.js";
@@ -62,6 +63,8 @@ export interface RealRunOptions {
   config: ForgeConfig;
   exitOnBlock?: boolean;
   sampleCap?: number;
+  /** sandbox database: "pglite" (in-process, no Docker) or "docker". Default pglite. */
+  dbBackend?: "pglite" | "docker";
 }
 
 function verdictToOpEvent(op: AgentOperation, verdict: PolicyVerdict): OpEvent {
@@ -95,7 +98,7 @@ export class RealRunEngine extends EventEmitter {
   constructor(private opts: RealRunOptions, deps: Partial<RealRunDeps> = {}) {
     super();
     this.deps = {
-      startDb: deps.startDb ?? (() => startPostgres()),
+      startDb: deps.startDb ?? (() => (opts.dbBackend === "docker" ? startPostgres() : startPglite())),
       startMock: deps.startMock ?? ((s) => startMockServer(s)),
       createFs: deps.createFs ?? ((scope, ro) => createFsSandbox(scope, ro)),
       spawnApp: deps.spawnApp ?? defaultSpawnApp,
@@ -134,7 +137,7 @@ export class RealRunEngine extends EventEmitter {
 
     try {
       // ── backends ──────────────────────────────────────────────────
-      log("info", "starting sandbox database (Docker — first run may pull the image)…");
+      log("info", this.opts.dbBackend === "docker" ? "starting sandbox database (Docker — first run may pull the image)…" : "starting sandbox database (pglite, in-process)…");
       db = await this.deps.startDb();
       const schema = generateSchema(db.connectionString());
       log("info", "seeding synthetic data…");

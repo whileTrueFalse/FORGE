@@ -83,8 +83,9 @@ forge report run-1
 forge approve run-1
 ```
 
-> **Requirements:** Node.js 20.6+ (uses `--import`). The scripted path needs
-> nothing else. The [real engine](#the-real-engine) additionally needs Docker.
+> **Requirements:** Node.js 20.6+ (uses `--import`). **No Docker needed** — the
+> real engine defaults to an in-process Postgres (pglite); Docker is optional
+> (`--real --db docker`) for closest-to-prod concurrency.
 
 [↑ Contents](#contents)
 
@@ -98,10 +99,10 @@ dashboard and report are identical either way:
 | | `forge run` (scripted) | `forge run --real` (real) |
 |---|---|---|
 | **Agent operations** | deterministic built-in scenario | intercepted from a live Node app |
-| **Database** | record-count metadata | seeded **Docker Postgres** |
+| **Database** | record-count metadata | seeded **Postgres** (in-process pglite, or Docker) |
 | **Third-party APIs** | preset metadata | local **mock HTTP server** |
 | **Simulations** | seeded pass/fail numbers | real HTTP traffic + assertions |
-| **Needs Docker?** | no | yes (sandbox DB) |
+| **Needs Docker?** | no | **no** (pglite default) · Docker optional |
 | **Use it for** | demos, CI, the UX, instant feedback | actually catching real bugs |
 
 Start with scripted to learn the flow; switch to `--real` to point Forge at a
@@ -153,7 +154,7 @@ intercepts everything it does. Full design: [`docs/09-ENGINE-ARCHITECTURE.md`](d
 
 ```
 forge run --real
-  1. start Docker Postgres (seeded from your schema)   ── ephemeral, torn down after
+  1. start sandbox Postgres, seeded from your schema   ── in-process pglite (no Docker) by default
   2. start a local mock HTTP server (Stripe/SendGrid)
   3. spawn your app with NODE_OPTIONS=--import <forge-hook>
         the hook patches pg/http/fs → policy verdict → ENFORCE → reports over IPC
@@ -167,7 +168,7 @@ strips PII, swaps a host for the mock), a **block** throws the policy reason
 into the app. Because we intercept at the library boundary, there is **no TLS
 MITM and no CA to trust**.
 
-**To do a real run** (needs Docker running):
+**To do a real run** (no Docker required):
 
 ```bash
 # one-time: install the sample app's dependency
@@ -175,7 +176,8 @@ cd examples/acme-checkout && npm install && cd -
 
 # in your forge project:
 forge target set "node src/server.mjs" --port 3000 --cwd <abs path to examples/acme-checkout>
-forge run --real
+forge run --real                 # in-process pglite sandbox DB
+forge run --real --db docker     # opt into a Docker Postgres container instead
 ```
 
 The sample app ([`examples/acme-checkout`](examples/acme-checkout)) ships an
@@ -183,9 +185,9 @@ The sample app ([`examples/acme-checkout`](examples/acme-checkout)) ships an
 the `expired_card_with_coupon` simulation surfaces a *real* failure — not a
 seeded number.
 
-> No Docker? The DB backend is a swappable interface; an in-process **pglite**
-> backend (real Postgres via WASM, zero infrastructure) is a planned fallback so
-> `--real` can run without Docker.
+> The DB backend is a swappable interface. The **default is pglite** (real
+> Postgres via WASM, in-process, zero infrastructure) so `--real` runs anywhere;
+> `--db docker` opts into a real Postgres container for concurrency/closest-to-prod.
 
 [↑ Contents](#contents)
 
@@ -358,8 +360,8 @@ orchestrator (with fake backends), and the interactive shell + TUI (headless via
 | `forge.yaml` read/write, run reports, diffs, approval gate | **Real** |
 | Policy engine (6 rules, presets) | **Real**, pure, unit-tested |
 | Scripted `forge run` (agent scenario, sim numbers) | Deterministic fake — the demo |
-| Real interception (`--real`): pg/http/fs hook + enforcement | **Real**, tested |
-| Sandbox Postgres (Docker) + mock server + FS sandbox | **Real** (Postgres needs Docker) |
+| Real interception (`--real`): pg/http/fs hook + enforcement | **Real**, tested, runs end-to-end |
+| Sandbox Postgres (pglite in-process, or Docker) + mock server + FS sandbox | **Real** — no Docker needed |
 | Sim driver (persona/script → real HTTP → assertions) | **Real**, tested |
 | OS-level syscall interception, hardened container isolation | Not yet — see roadmap |
 

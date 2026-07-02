@@ -93,7 +93,8 @@ program
   .description("Execute the attached agent's task against the sandbox")
   .option("--task <description>", "task description for the run header")
   .option("--policy <preset>", "override the active policy preset for this run")
-  .option("--real", "use the real engine (Docker sandbox + live interception)")
+  .option("--real", "use the real engine (live interception; in-process DB by default)")
+  .option("--db <backend>", "sandbox DB for --real: pglite (default, no Docker) | docker")
   .option("--sample <n>", "sampled sessions per simulation for real runs")
   .option("--exit-on-block", "exit with non-zero code if a block goes unresolved")
   .action(run);

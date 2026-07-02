@@ -9,6 +9,7 @@ import { readHookConfig, emitOp, emitLog, emitReady } from "./ipc.js";
 import { installPgPatch } from "./patchPg.js";
 import { installHttpPatch } from "./patchHttp.js";
 import { installFsPatch } from "./patchFs.js";
+import { buildKnownMocksMap } from "../../core/policyEngine.js";
 import type { InterceptDeps } from "./intercept.js";
 
 function main(): void {
@@ -20,7 +21,9 @@ function main(): void {
 
   const deps: InterceptDeps = {
     policy: config.policy,
-    ctx: { scope: config.scope, readOnly: config.readOnly, knownMocks: {} },
+    // Tell the policy engine which third-party hosts are mocked, so an outbound
+    // call to a registered service is a redirect (rewrite), not a block.
+    ctx: { scope: config.scope, readOnly: config.readOnly, knownMocks: buildKnownMocksMap(config.mocks) },
     emit: emitOp,
   };
 

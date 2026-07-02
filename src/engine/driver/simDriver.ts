@@ -4,6 +4,7 @@
 // expired-card + coupon bug). Volume is sampled — rates are real, displayed
 // session totals are extrapolated. See docs/09-ENGINE-ARCHITECTURE.md §8.
 
+import { randomUUID } from "node:crypto";
 import { buildJourney, pickPersona } from "./personas.js";
 import type { Persona, SimFile, SimResult, SimulationRef } from "../../types.js";
 
@@ -21,13 +22,14 @@ interface SessionOutcome {
 }
 
 async function runSession(baseUrl: string, persona: Persona, rand: () => number): Promise<SessionOutcome> {
+  const sessionId = randomUUID(); // correlates the journey's requests + is a valid uuid for the schema
   const journey = buildJourney(persona, rand);
   for (const req of journey) {
     let res: Response;
     try {
       res = await fetch(`${baseUrl}${req.path}`, {
         method: req.method,
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", "x-session": sessionId },
         body: req.body ? JSON.stringify(req.body) : undefined,
       });
     } catch (e) {

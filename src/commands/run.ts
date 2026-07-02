@@ -15,6 +15,7 @@ interface RunOptions {
   exitOnBlock?: boolean;
   real?: boolean;
   sample?: string;
+  db?: string;
 }
 
 const VALID_PRESETS: PolicyPreset[] = ["default", "strict", "soc2", "hipaa", "custom"];
@@ -55,17 +56,18 @@ export async function run(options: RunOptions): Promise<void> {
   const task = options.task ?? "add coupon validation to checkout";
   const runId = nextRunId();
 
-  // ── real engine path (Docker sandbox + real interception) ──────────
+  // ── real engine path (sandbox DB + real interception) ──────────────
   if (options.real) {
     if (!config.target) {
       ui.errorBox("no target app set", "run `forge target set` first (configure the app Forge runs)");
       process.exitCode = 1;
       return;
     }
-    if (!(await dockerAvailable())) {
+    const dbBackend = options.db === "docker" ? "docker" : "pglite";
+    if (dbBackend === "docker" && !(await dockerAvailable())) {
       ui.errorBox(
         "Docker not available",
-        "the real sandbox database needs Docker running — or use the scripted run: `forge run`"
+        "start Docker, use the default in-process DB (`forge run --real`), or the scripted run (`forge run`)"
       );
       process.exitCode = 1;
       return;
@@ -74,6 +76,7 @@ export async function run(options: RunOptions): Promise<void> {
       runId,
       task,
       config,
+      dbBackend,
       sampleCap: options.sample ? Number(options.sample) : 50,
     });
     attachPlainRenderer(engine);
