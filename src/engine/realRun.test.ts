@@ -26,6 +26,7 @@ function fakeDeps(): RealRunDeps {
   const app: AppHandle = {
     onMessage: (cb) => messages.on("m", cb),
     ready: Promise.resolve(),
+    exited: Promise.resolve(0),
     baseUrl: "http://127.0.0.1:3000",
     kill: () => {},
   };
@@ -64,6 +65,44 @@ test("realRun: emits header → op/stat → sim:result → done with a real reco
   assert.equal(r.policyStats.intercepts, 1); // the rewrite op
   assert.equal(r.simResults[0].failingPersona, "expired_card_with_coupon");
   assert.equal(r.passRate, 66); // 330/500
+});
+
+test("realRun exec mode: runs a command, intercepts its ops, drives no sims", async () => {
+  const cfg = config();
+  const messages = new EventEmitter();
+  let resolveExit: (c: number) => void = () => {};
+  const app: AppHandle = {
+    onMessage: (cb) => messages.on("m", cb),
+    ready: Promise.resolve(),
+    exited: new Promise<number>((r) => (resolveExit = r)),
+    baseUrl: "",
+    kill: () => {},
+  };
+  const deps: RealRunDeps = {
+    startDb: async () => ({ connectionString: () => "x", seed: async () => {}, teardown: async () => {} }),
+    startMock: async () => ({ url: "http://x", port: 1, serviceForHost: {}, calls: [], close: async () => {} }),
+    createFs: () => ({ root: "/x", allows: () => true, teardown: async () => {} }),
+    spawnApp: () => {
+      setImmediate(() => {
+        const m: HookMessage = { t: "op", op: { id: "1", kind: "db_query", sql: "SELECT * FROM users", file: "probe.mjs" }, verdict: { operation: { id: "1", kind: "db_query", sql: "x", file: "probe.mjs" }, verdict: "block", reason: "wildcard" } };
+        messages.emit("m", m);
+        resolveExit(1);
+      });
+      return app;
+    },
+    driveSim: async () => {
+      throw new Error("driveSim must not run in exec mode");
+    },
+    captureDiff: async () => [],
+  };
+  const engine = new RealRunEngine({ runId: "run-1", task: "node probe.mjs", config: cfg, exec: "node probe.mjs" }, deps);
+  const seen: string[] = [];
+  for (const ev of ["header", "op", "sim:result", "done"] as const) engine.on(ev, () => seen.push(ev));
+  const outcome = await engine.run();
+  assert.ok(seen.includes("op"));
+  assert.equal(seen.includes("sim:result"), false); // no sims in exec mode
+  assert.equal(seen[seen.length - 1], "done");
+  assert.equal(outcome.record.report.policyStats.blocks, 1);
 });
 
 test("parseUnifiedDiff: extracts files, status, and +/- lines", () => {

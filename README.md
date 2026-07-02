@@ -108,6 +108,30 @@ dashboard and report are identical either way:
 Start with scripted to learn the flow; switch to `--real` to point Forge at a
 real app.
 
+### The isolation box — run *any* command sandboxed
+
+Beyond the server + simulations flow, Forge is a general **isolation box**: give
+it any command and it runs that command inside the sandbox — the app/agent/
+script/test doesn't know it's enclosed, and every db/http/fs operation it makes
+is intercepted, policy-enforced, and redirected to the sandbox.
+
+```bash
+forge box "node script.mjs"      # run any code inside the box
+forge box "npm test"             # run your test suite sandboxed
+forge run --exec "node migrate.mjs"   # same thing, via run
+```
+
+```
+forge hook installed (pg=true, db=sandbox)
+✓ SELECT id, tier FROM users LIMIT 1          ← safe query, allowed
+✗ SELECT * FROM users LIMIT 1                 ← wildcard, BLOCKED
+⚠ connect → api.stripe.com → redirected to mock
+```
+
+Forge is the box; you bring the code. Real Postgres (pglite, no Docker), a mock
+server for outbound calls, and a scoped filesystem — nothing touches real
+systems.
+
 [↑ Contents](#contents)
 
 ---
@@ -277,6 +301,7 @@ active rule set via `resolvePolicyRules`.
 | `forge attach <agent> --scope <glob>` | attach an agent + its write scope |
 | `forge target set <start> --port <n>` | configure the app for `--real` runs |
 | `forge run [--real] [--task …] [--policy …]` | run the sandbox (scripted or real) |
+| `forge box <command>` / `forge run --exec <command>` | run **any command** inside the isolated box |
 | `forge diff <run-id>` | show a run's code diff |
 | `forge report <run-id>` | render a run's full report |
 | `forge approve <run-id> [--force]` | approve a run (gated by pass rate) |

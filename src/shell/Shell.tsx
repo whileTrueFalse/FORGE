@@ -203,6 +203,21 @@ export function Shell(): React.JSX.Element {
     setMode("run");
   };
 
+  const launchBox = (command: string) => {
+    const config = loadForgeYaml();
+    if (!config) return pushResult("forge box", [{ text: "✗ no project — run forge init first", tone: "err" }], false);
+    const runId = nextRunId();
+    const engine = new RealRunEngine({ runId, task: command, config, dbBackend: "pglite", exec: command });
+    engine.once("done", (outcome: unknown) => {
+      const o = outcome as { record: RunRecord };
+      saveRun(o.record);
+      saveDiffPatch(runId, buildPatchText(o.record.diffs));
+      if (runRef.current) runRef.current.outcome = o.record;
+    });
+    runRef.current = { engine, config };
+    setMode("run");
+  };
+
   const exitRun = () => {
     const r = runRef.current;
     setMode("shell");
@@ -272,6 +287,12 @@ export function Shell(): React.JSX.Element {
         return;
       }
       return launchRun(task);
+    }
+    if (cmd.special === "box") {
+      const command = tokens.slice(2).join(" ").replace(/^["']|["']$/g, "");
+      if (!command) return pushResult(line, [{ text: "✗ usage: forge box <command>", tone: "err" }], false);
+      launchBox(command);
+      return;
     }
 
     try {

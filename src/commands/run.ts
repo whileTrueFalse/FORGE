@@ -16,15 +16,49 @@ interface RunOptions {
   real?: boolean;
   sample?: string;
   db?: string;
+  exec?: string;
 }
 
 const VALID_PRESETS: PolicyPreset[] = ["default", "strict", "soc2", "hipaa", "custom"];
+
+/** Wire the plain renderer + progress logging + save to a real-engine run. */
+async function runRealEngine(engine: RealRunEngine, runId: string, exitOnBlock: boolean, label: string): Promise<void> {
+  attachPlainRenderer(engine);
+  engine.on("log", (e) => {
+    if (e.level === "error") ui.blocked(e.message);
+    else if (e.level === "warn") ui.warn(e.message);
+    else ui.dim(`  ${e.message}`);
+  });
+  try {
+    const outcome = await engine.run();
+    saveRun(outcome.record);
+    saveDiffPatch(runId, buildPatchText(outcome.record.diffs));
+    if (exitOnBlock && outcome.hadUnresolvedBlock) process.exitCode = 1;
+  } catch (err) {
+    ui.errorBox(`${label} failed`, err instanceof Error ? err.message : String(err));
+    process.exitCode = 1;
+  }
+}
 
 export async function run(options: RunOptions): Promise<void> {
   const config = loadForgeYaml();
   if (!config) {
     ui.errorBox("no forge.yaml found", "run `forge init` first");
     process.exitCode = 1;
+    return;
+  }
+
+  // ── box mode: run ANY command inside the sandbox (no agent/target/sims) ──
+  if (options.exec) {
+    const dbBackend = options.db === "docker" ? "docker" : "pglite";
+    if (dbBackend === "docker" && !(await dockerAvailable())) {
+      ui.errorBox("Docker not available", "start Docker, or use the default in-process DB");
+      process.exitCode = 1;
+      return;
+    }
+    const runId = nextRunId();
+    const engine = new RealRunEngine({ runId, task: options.exec, config, dbBackend, exec: options.exec });
+    await runRealEngine(engine, runId, Boolean(options.exitOnBlock), "box run");
     return;
   }
 
@@ -79,22 +113,7 @@ export async function run(options: RunOptions): Promise<void> {
       dbBackend,
       sampleCap: options.sample ? Number(options.sample) : 50,
     });
-    attachPlainRenderer(engine);
-    // Surface backend progress (the plain renderer doesn't print log events).
-    engine.on("log", (e) => {
-      if (e.level === "error") ui.blocked(e.message);
-      else if (e.level === "warn") ui.warn(e.message);
-      else ui.dim(`  ${e.message}`);
-    });
-    try {
-      const realOutcome = await engine.run();
-      saveRun(realOutcome.record);
-      saveDiffPatch(runId, buildPatchText(realOutcome.record.diffs));
-      if (options.exitOnBlock && realOutcome.hadUnresolvedBlock) process.exitCode = 1;
-    } catch (err) {
-      ui.errorBox("real run failed", err instanceof Error ? err.message : String(err));
-      process.exitCode = 1;
-    }
+    await runRealEngine(engine, runId, Boolean(options.exitOnBlock), "real run");
     return;
   }
 

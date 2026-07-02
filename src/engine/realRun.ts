@@ -41,9 +41,21 @@ import type {
 const exec = promisify(execFile);
 const HOOK_PATH = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "hook/preload.js");
 
+export interface SpawnSpec {
+  command: string;
+  cwd?: string;
+  /** if set, the process is a server; `ready` resolves after a health probe. */
+  port?: number;
+  ready?: string;
+  env: NodeJS.ProcessEnv;
+}
+
 export interface AppHandle {
   onMessage(cb: (m: HookMessage) => void): void;
+  /** resolves when a server is reachable (server mode); resolves immediately in exec mode. */
   ready: Promise<void>;
+  /** resolves with the process exit code when it terminates. */
+  exited: Promise<number>;
   baseUrl: string;
   kill(): void;
 }
@@ -52,7 +64,7 @@ export interface RealRunDeps {
   startDb(): Promise<DbBackend>;
   startMock(services: string[]): Promise<MockServerHandle>;
   createFs(scope: string, readOnly: string[]): FsSandbox;
-  spawnApp(o: { target: TargetConfig; env: NodeJS.ProcessEnv }): AppHandle;
+  spawnApp(spec: SpawnSpec): AppHandle;
   driveSim(sim: SimulationRef, simFile: SimFile | null, baseUrl: string, onProgress: (d: number, t: number) => void): Promise<SimResult>;
   captureDiff(cwd: string): Promise<FileDiff[]>;
 }
@@ -65,6 +77,9 @@ export interface RealRunOptions {
   sampleCap?: number;
   /** sandbox database: "pglite" (in-process, no Docker) or "docker". Default pglite. */
   dbBackend?: "pglite" | "docker";
+  /** exec mode: run this command inside the box to completion (instead of the
+   *  server + simulations flow). This is the general "isolation box". */
+  exec?: string;
 }
 
 function verdictToOpEvent(op: AgentOperation, verdict: PolicyVerdict): OpEvent {
@@ -147,7 +162,14 @@ export class RealRunEngine extends EventEmitter {
       fs = this.deps.createFs(agent?.scope ?? "**", agent?.read_only ?? []);
       log("info", `sandbox ready: db + ${mockNames.length} mock(s)`);
 
-      // ── spawn the app under the hook ────────────────────────────────
+      // ── enclose + run under the hook ────────────────────────────────
+      // exec mode: run an arbitrary command to completion inside the box.
+      // server mode: launch the target app, then drive simulations at it.
+      const isExec = Boolean(this.opts.exec);
+      const command = isExec ? this.opts.exec! : config.target!.start;
+      const cwd = isExec ? this.opts.config.target?.cwd ?? process.cwd() : config.target?.cwd;
+      const port = isExec ? undefined : config.target!.port;
+
       const hookConfig: HookConfig = {
         policy: resolvePolicyRules(config.policy),
         scope: agent?.scope ?? "**",
@@ -162,10 +184,10 @@ export class RealRunEngine extends EventEmitter {
         NODE_OPTIONS: `${process.env.NODE_OPTIONS ?? ""} --import ${pathToFileURL(HOOK_PATH).href}`.trim(),
         FORGE_HOOK_CONFIG: encodeHookConfig(hookConfig),
         DATABASE_URL: db.connectionString(),
-        PORT: String(config.target!.port),
+        ...(port ? { PORT: String(port) } : {}),
       };
-      log("info", `launching app: ${config.target!.start}`);
-      app = this.deps.spawnApp({ target: config.target!, env });
+      log("info", `${isExec ? "running in the box" : "launching app"}: ${command}`);
+      app = this.deps.spawnApp({ command, cwd, port, ready: config.target?.ready, env });
 
       app.onMessage((m) => {
         if (m.t === "op") {
@@ -188,24 +210,28 @@ export class RealRunEngine extends EventEmitter {
         }
       });
 
-      log("info", "waiting for the app to be ready…");
-      await app.ready;
-      log("info", "app ready — driving simulations");
-
-      // ── sims ──────────────────────────────────────────────────────
-      for (const sim of config.simulations) {
-        this.emit("sim:start", { name: sim.name, sessions: sim.sessions });
-        const simFile = loadSimMeta(sim);
-        const result = await this.deps.driveSim(sim, simFile, app.baseUrl, (count, total) =>
-          this.emit("sim:progress", { name: sim.name, count, total })
-        );
-        simResults.push(result);
-        this.emit("sim:result", { result });
-        const rate = (result.passedSessions / result.totalSessions) * 100;
-        log(rate >= 95 ? "ok" : "warn", `${sim.name}: ${result.passedSessions}/${result.totalSessions} passed`);
+      if (isExec) {
+        // The command IS the workload — run it to completion, no simulations.
+        const code = await app.exited;
+        log(code === 0 ? "ok" : "warn", `command exited (code ${code})`);
+      } else {
+        log("info", "waiting for the app to be ready…");
+        await app.ready;
+        log("info", "app ready — driving simulations");
+        for (const sim of config.simulations) {
+          this.emit("sim:start", { name: sim.name, sessions: sim.sessions });
+          const simFile = loadSimMeta(sim);
+          const result = await this.deps.driveSim(sim, simFile, app.baseUrl, (count, total) =>
+            this.emit("sim:progress", { name: sim.name, count, total })
+          );
+          simResults.push(result);
+          this.emit("sim:result", { result });
+          const rate = (result.passedSessions / result.totalSessions) * 100;
+          log(rate >= 95 ? "ok" : "warn", `${sim.name}: ${result.passedSessions}/${result.totalSessions} passed`);
+        }
       }
 
-      diffs = await this.deps.captureDiff(config.target?.cwd ?? process.cwd());
+      diffs = await this.deps.captureDiff(cwd ?? process.cwd());
     } finally {
       // Always tear down so a Docker container / app process never leaks.
       try {
@@ -251,30 +277,40 @@ export class RealRunEngine extends EventEmitter {
 
 // ── default real implementations (need Docker / a real app to exercise) ──
 
-function defaultSpawnApp({ target, env }: { target: TargetConfig; env: NodeJS.ProcessEnv }): AppHandle {
-  const [cmd, ...args] = target.start.split(" ");
-  // Suppress the app's stdout/stderr so it can't corrupt the TUI; ops/logs come
-  // back over the IPC channel instead.
-  const child = spawn(cmd, args, { cwd: target.cwd ?? process.cwd(), env, stdio: ["ignore", "ignore", "ignore", "ipc"] });
+function defaultSpawnApp(spec: SpawnSpec): AppHandle {
+  const [cmd, ...args] = spec.command.split(" ");
+  // Suppress the process's stdout/stderr so it can't corrupt the TUI; ops/logs
+  // come back over the IPC channel instead.
+  // NOTE: no `shell: true` — a shell would take the IPC fd instead of node,
+  // killing the hook's process.send channel. Spawn the executable directly.
+  const child = spawn(cmd, args, { cwd: spec.cwd ?? process.cwd(), env: spec.env, stdio: ["ignore", "ignore", "ignore", "ipc"] });
   const emitter = new EventEmitter();
   child.on("message", (m) => emitter.emit("message", m));
-  const baseUrl = `http://127.0.0.1:${target.port}`;
-  const readyPath = target.ready ?? "/health";
-  const ready = (async () => {
-    for (let i = 0; i < 60; i++) {
-      try {
-        const res = await fetch(`${baseUrl}${readyPath}`);
-        if (res.ok) return;
-      } catch {
-        /* not up yet */
-      }
-      await new Promise((r) => setTimeout(r, 500));
-    }
-    throw new Error("target app did not become ready");
-  })();
+
+  const exited = new Promise<number>((resolve) => child.on("exit", (code) => resolve(code ?? 0)));
+  const baseUrl = spec.port ? `http://127.0.0.1:${spec.port}` : "";
+
+  // Server mode: poll a health endpoint. Exec mode (no port): ready immediately.
+  const ready = spec.port
+    ? (async () => {
+        const readyPath = spec.ready ?? "/health";
+        for (let i = 0; i < 60; i++) {
+          try {
+            const res = await fetch(`${baseUrl}${readyPath}`);
+            if (res.ok) return;
+          } catch {
+            /* not up yet */
+          }
+          await new Promise((r) => setTimeout(r, 500));
+        }
+        throw new Error("target app did not become ready");
+      })()
+    : Promise.resolve();
+
   return {
     onMessage: (cb) => emitter.on("message", cb),
     ready,
+    exited,
     baseUrl,
     kill: () => child.kill(),
   };

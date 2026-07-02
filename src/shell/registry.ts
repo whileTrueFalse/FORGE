@@ -78,7 +78,7 @@ export interface Command {
   args?: ArgSpec[];
   form?: FormField[];
   run?: Handler;
-  special?: "run" | "clear" | "quit" | "guide";
+  special?: "run" | "box" | "clear" | "quit" | "guide";
 }
 
 /** Build a handler argv from collected form values (positionals + flags). */
@@ -413,6 +413,7 @@ export const COMMANDS: Command[] = [
     ],
   },
   { name: "run", summary: "run the sandbox — add --real for the live engine", special: "run", args: [{ name: "--task / --real", placeholder: '--task "add coupon validation" [--real]' }] },
+  { name: "box", summary: "run ANY command inside the sandbox box (isolated + intercepted)", special: "box", args: [{ name: "command", required: true, placeholder: "node script.mjs" }] },
   {
     name: "diff",
     summary: "show a run's code diff",
