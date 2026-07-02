@@ -90,7 +90,20 @@ export async function run(options: RunOptions): Promise<void> {
   const task = options.task ?? "add coupon validation to checkout";
   const runId = nextRunId();
 
-  // ── real engine path (sandbox DB + real interception) ──────────────
+  // ── attached command → run it in the box (the unified attach→box flow) ──
+  if (agent.command && !options.real) {
+    const dbBackend = options.db === "docker" ? "docker" : "pglite";
+    if (dbBackend === "docker" && !(await dockerAvailable())) {
+      ui.errorBox("Docker not available", "start Docker, or use the default in-process DB");
+      process.exitCode = 1;
+      return;
+    }
+    const engine = new RealRunEngine({ runId, task: agent.command, config, dbBackend, exec: agent.command });
+    await runRealEngine(engine, runId, Boolean(options.exitOnBlock), "box run");
+    return;
+  }
+
+  // ── real engine path (server + simulations) ─────────────────────────
   if (options.real) {
     if (!config.target) {
       ui.errorBox("no target app set", "run `forge target set` first (configure the app Forge runs)");

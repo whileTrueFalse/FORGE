@@ -286,6 +286,12 @@ export function Shell(): React.JSX.Element {
         void launchRealRun(task);
         return;
       }
+      // Attached a command? `forge run` runs it in the box.
+      const attachedCmd = loadForgeYaml()?.agents[0]?.command;
+      if (attachedCmd) {
+        launchBox(attachedCmd);
+        return;
+      }
       return launchRun(task);
     }
     if (cmd.special === "box") {

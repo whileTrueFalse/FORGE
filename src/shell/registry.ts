@@ -355,6 +355,7 @@ export const COMMANDS: Command[] = [
     form: [
       { key: "agent", label: "agent", choices: ["cursor", "claude-code", "copilot", "windsurf"], default: "cursor" },
       { key: "--scope", label: "write scope (glob)", placeholder: "./src/checkout/**", required: true },
+      { key: "--exec", label: "command to run in the box (optional)", placeholder: "node agent-task.mjs" },
     ],
     run: (argv) => {
       const c = loadForgeYaml();
@@ -365,12 +366,15 @@ export const COMMANDS: Command[] = [
       const scope = typeof flags.scope === "string" ? flags.scope : "";
       if (!scope) return err("--scope is required", 'e.g. --scope "./src/checkout/**"');
       const readOnly = typeof flags["read-only"] === "string" ? [flags["read-only"]] : [];
-      c.agents = [{ name: agent, scope, read_only: readOnly, env: "sandbox", attached_at: new Date().toISOString() }];
+      const command = typeof flags.exec === "string" ? flags.exec : undefined;
+      c.agents = [{ name: agent, scope, read_only: readOnly, env: "sandbox", attached_at: new Date().toISOString(), command }];
       saveForgeYaml(c);
       const st = loadState();
       st.attachedAgent = { sessionId: uuidv4().slice(0, 8), name: agent, scope, readOnly, attachedAt: new Date().toISOString() };
       saveState(st);
-      return ok({ text: `✓ ${agent} attached`, tone: "ok" }, { text: `  scope: ${scope}  ·  env: sandbox`, tone: "dim" });
+      const lines: OutLine[] = [{ text: `✓ ${agent} attached`, tone: "ok" }, { text: `  scope: ${scope}  ·  env: sandbox`, tone: "dim" }];
+      if (command) lines.push({ text: `  runs in the box: ${command}  →  forge run`, tone: "dim" });
+      return { ok: true, lines };
     },
   },
   {

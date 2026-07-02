@@ -119,6 +119,10 @@ is intercepted, policy-enforced, and redirected to the sandbox.
 forge box "node script.mjs"      # run any code inside the box
 forge box "npm test"             # run your test suite sandboxed
 forge run --exec "node migrate.mjs"   # same thing, via run
+
+# …or attach it once, then just `forge run`:
+forge attach my-agent --scope "./**" --exec "node agent-task.mjs"
+forge run                        # runs the attached command in the box
 ```
 
 ```
@@ -298,7 +302,7 @@ active rule set via `resolvePolicyRules`.
 | `forge db status` | show the linked database + schema |
 | `forge mock add <service>` | register a mock API (`stripe`/`sendgrid`/`twilio`) |
 | `forge sim add --file / --user-type` | register a simulation |
-| `forge attach <agent> --scope <glob>` | attach an agent + its write scope |
+| `forge attach <agent> --scope <glob> [--exec <cmd>]` | connect an agent/command to the box; `forge run` then runs it sandboxed |
 | `forge target set <start> --port <n>` | configure the app for `--real` runs |
 | `forge run [--real] [--task …] [--policy …]` | run the sandbox (scripted or real) |
 | `forge box <command>` / `forge run --exec <command>` | run **any command** inside the isolated box |

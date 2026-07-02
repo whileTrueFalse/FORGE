@@ -8,6 +8,7 @@ import type { AgentConfig } from "../types.js";
 interface AttachOptions {
   scope?: string;
   readOnly?: string[];
+  exec?: string;
 }
 
 export async function attach(agentName: string, options: AttachOptions): Promise<void> {
@@ -30,6 +31,7 @@ export async function attach(agentName: string, options: AttachOptions): Promise
     read_only: options.readOnly ?? [],
     env: "sandbox",
     attached_at: new Date().toISOString(),
+    command: options.exec,
   };
 
   // v0: only one attached agent at a time — overwrite rather than append.
@@ -49,8 +51,8 @@ export async function attach(agentName: string, options: AttachOptions): Promise
   console.log();
   ui.ok(`${agentName} attached`);
   ui.dim(`  scope: ${options.scope}`);
+  if (options.exec) ui.dim(`  runs in the box: ${options.exec}`);
   ui.dim(`  env: sandbox (sim db + mocks injected automatically)`);
   console.log();
-  console.log("watch live:  forge log --follow");
-  console.log("run now:     forge run");
+  console.log(options.exec ? "run now:     forge run   (runs your command in the box)" : "run now:     forge run");
 }

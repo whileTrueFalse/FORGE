@@ -52,6 +52,8 @@ export interface AgentConfig {
   read_only: string[];
   env: "sandbox";
   attached_at: string;
+  /** the command this agent runs inside the box; `forge run` executes it. */
+  command?: string;
 }
 
 export interface ApproveConfig {

@@ -75,6 +75,7 @@ program
   .argument("<agent>", "agent name, e.g. cursor, claude-code")
   .option("--scope <glob>", "glob the agent may write within (required)")
   .option("--read-only <globs...>", "globs the agent may read but not write")
+  .option("--exec <command>", "command this agent runs inside the box (run with `forge run`)")
   .action(attach);
 
 const target = program.command("target").description("Configure the app to run for real (--real) runs");
