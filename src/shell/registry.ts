@@ -31,6 +31,9 @@ import {
 import { getPreset, listPresets } from "../core/mockApi.js";
 import { summarizeDiffs } from "../core/diffFormat.js";
 import { detectProject } from "../core/detect.js";
+import { POLICY_PRESETS, describePreset } from "../core/policyEngine.js";
+
+const POLICY_HELP: Record<string, string> = Object.fromEntries(POLICY_PRESETS.map((p) => [p.name, p.description]));
 import type {
   ForgeConfig,
   DbSchema,
@@ -61,6 +64,8 @@ export interface FormField {
   placeholder?: string;
   required?: boolean;
   choices?: string[];
+  /** optional description shown for the highlighted choice. */
+  choiceHelp?: Record<string, string>;
   default?: string;
 }
 export type Handler = (argv: string[]) => CommandResult | Promise<CommandResult>;
@@ -164,7 +169,7 @@ export const COMMANDS: Command[] = [
     args: [{ name: "name", placeholder: "project-name" }],
     form: [
       { key: "name", label: "project name", placeholder: "acme-checkout", required: true },
-      { key: "--policy", label: "policy preset", choices: ["default", "strict", "soc2", "hipaa"], default: "default" },
+      { key: "--policy", label: "policy preset", choices: ["default", "strict", "soc2", "hipaa"], choiceHelp: POLICY_HELP, default: "default" },
     ],
     run: (argv) => {
       const { positionals, flags } = parseFlags(argv);
@@ -537,6 +542,57 @@ export const COMMANDS: Command[] = [
         { text: `  runs: ${runs.length ? runs.join(", ") : "none"}`, tone: "dim" }
       );
     },
+  },
+  {
+    name: "policy",
+    summary: "view or change the policy preset",
+    subcommands: [
+      {
+        name: "show",
+        summary: "show the current policy",
+        run: () => {
+          const c = loadForgeYaml();
+          if (!c) return noProject();
+          return ok(
+            { text: `preset: ${c.policy.preset}`, tone: "info" },
+            { text: `  ${describePreset(c.policy.preset)}`, tone: "dim" },
+            { text: `  on_intercept: ${c.policy.on_intercept}  ·  on_block: ${c.policy.on_block}`, tone: "dim" }
+          );
+        },
+      },
+      {
+        name: "list",
+        summary: "list all presets and what they do",
+        run: () => {
+          const lines: OutLine[] = [{ text: "Policy presets", tone: "head" }];
+          for (const p of POLICY_PRESETS) {
+            lines.push({ text: `  ${p.name}`, tone: "ok" });
+            lines.push({ text: `    ${p.description}`, tone: "dim" });
+          }
+          return { ok: true, lines };
+        },
+      },
+      {
+        name: "set",
+        summary: "change the policy preset",
+        args: [{ name: "preset", required: true, placeholder: "default | strict | soc2 | hipaa" }],
+        form: [{ key: "preset", label: "policy preset", choices: ["default", "strict", "soc2", "hipaa", "custom"], choiceHelp: POLICY_HELP, default: "default" }],
+        run: (argv) => {
+          const c = loadForgeYaml();
+          if (!c) return noProject();
+          const raw = parseFlags(argv).positionals[0];
+          if (!raw) return err("missing preset", "e.g. forge policy set strict");
+          if (!(VALID_PRESETS as string[]).includes(raw.toLowerCase())) {
+            return err(`unknown preset: ${raw}`, `valid: ${VALID_PRESETS.join(", ")}`);
+          }
+          const preset = raw.toLowerCase() as PolicyPreset;
+          c.policy.preset = preset;
+          c.policy.on_block = preset === "soc2" || preset === "hipaa" ? "stop_run" : "notify_agent";
+          saveForgeYaml(c);
+          return ok({ text: `✓ policy → ${preset}`, tone: "ok" }, { text: `  ${describePreset(preset)}`, tone: "dim" });
+        },
+      },
+    ],
   },
   { name: "guide", summary: "open the Forge user guide", special: "guide" },
   { name: "help", summary: "list all commands", run: () => helpResult() },

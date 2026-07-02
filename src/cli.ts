@@ -16,6 +16,7 @@ import { report } from "./commands/report.js";
 import { approve } from "./commands/approve.js";
 import { connect, disconnect } from "./commands/connect.js";
 import { targetSet, targetShow } from "./commands/target.js";
+import { policyShow, policyList, policySet } from "./commands/policy.js";
 import { launchShell } from "./shell/launch.js";
 
 const program = new Command();
@@ -77,6 +78,15 @@ program
   .option("--read-only <globs...>", "globs the agent may read but not write")
   .option("--exec <command>", "command this agent runs inside the box (run with `forge run`)")
   .action(attach);
+
+const policy = program.command("policy").description("View or change the policy preset");
+policy.command("show").description("Show the current policy").action(policyShow);
+policy.command("list").description("List all presets and what they do").action(policyList);
+policy
+  .command("set")
+  .description("Change the policy preset")
+  .argument("<preset>", "default | strict | soc2 | hipaa | custom")
+  .action(policySet);
 
 const target = program.command("target").description("Configure the app to run for real (--real) runs");
 target

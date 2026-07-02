@@ -71,6 +71,11 @@ export function FormView({
                 {c}
               </Text>
             ))}
+            {field.choiceHelp?.[field.choices[choiceSel]] ? (
+              <Box marginTop={1}>
+                <Text dimColor>{field.choiceHelp[field.choices[choiceSel]]}</Text>
+              </Box>
+            ) : null}
           </Box>
         ) : (
           <Box marginTop={1}>

@@ -13,6 +13,19 @@ import type {
 
 const DEFAULT_PII_FIELDS = ["email", "phone", "address", "ssn"];
 
+/** Human-readable descriptions of each policy preset, for choosers + `forge policy`. */
+export const POLICY_PRESETS: { name: PolicyPreset; description: string }[] = [
+  { name: "default", description: "Core safety: block SELECT * and DROP/TRUNCATE, rewrite unscoped UPDATE/DELETE, enforce file scope, redirect outbound HTTP to mocks." },
+  { name: "strict", description: "Everything in default, plus block PII columns (email/phone/…) selected without a single-row lookup." },
+  { name: "soc2", description: "Strict rules, and any hard block STOPS the run (no auto-continue) — for audit-grade gating." },
+  { name: "hipaa", description: "Same controls as soc2, framed for protected health data." },
+  { name: "custom", description: "Start from the default rules and fine-tune them yourself." },
+];
+
+export function describePreset(name: PolicyPreset): string {
+  return POLICY_PRESETS.find((p) => p.name === name)?.description ?? "";
+}
+
 /**
  * Preset → active rule ids, per the table in docs/06-POLICY-ENGINE-SPEC.md
  * §"Preset → Rule Mapping". `default` omits rule 4 (PII allowlist on explicit
