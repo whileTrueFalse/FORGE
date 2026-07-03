@@ -21,6 +21,8 @@ import {
   loadRun,
   listRuns,
   saveRun,
+  getProjectRoot,
+  setProjectRoot,
 } from "../core/store.js";
 import {
   detectDbType,
@@ -173,15 +175,30 @@ export const COMMANDS: Command[] = [
     ],
     run: (argv) => {
       const { positionals, flags } = parseFlags(argv);
-      if (forgeYamlExists() && !flags.force) return err("forge.yaml already exists", "add --force to overwrite");
       const name = positionals[0] ?? (typeof flags.name === "string" ? flags.name : "my-project");
       const preset = normalizePreset(typeof flags.policy === "string" ? flags.policy : "default");
+
+      // If a project already exists here, scaffold the new one in ./<name>/ and
+      // switch the shell into it (so `forge init x` from within a project makes
+      // a fresh project, not an "already exists" error).
+      let inSubdir = false;
+      if (forgeYamlExists() && !flags.force) {
+        const sub = path.join(getProjectRoot(), name);
+        if (fs.existsSync(path.join(sub, "forge.yaml"))) {
+          return err(`project "${name}" already exists here`, "pick another name, or `forge switch " + name + "`");
+        }
+        fs.mkdirSync(sub, { recursive: true });
+        setProjectRoot(sub);
+        inSubdir = true;
+      }
+
       const config = defaultConfig(name, preset);
-      const detected = detectProject(process.cwd());
+      const detected = detectProject(getProjectRoot());
       if (detected.target) config.target = detected.target;
       ensureForgeDirs();
       saveForgeYaml(config);
-      const lines: OutLine[] = [{ text: `✓ project "${name}" created · policy ${preset}`, tone: "ok" }];
+      const lines: OutLine[] = [{ text: `✓ project "${name}" created${inSubdir ? ` in ./${name}/` : ""} · policy ${preset}`, tone: "ok" }];
+      if (inSubdir) lines.push({ text: `  switched here — \`forge switch ..\` to go back`, tone: "dim" });
       if (detected.target) lines.push({ text: `✓ ${detected.note}`, tone: "ok" });
       lines.push({ text: "next: forge db link  ·  forge mock add  ·  forge attach", tone: "dim" });
       return { ok: true, lines };
@@ -525,6 +542,30 @@ export const COMMANDS: Command[] = [
       if (Object.keys(c.integrations).length === 0) c.mode = "sandbox";
       saveForgeYaml(c);
       return ok({ text: `✓ github disconnected · mode → ${c.mode}`, tone: "ok" });
+    },
+  },
+  {
+    name: "switch",
+    summary: "switch to another project directory (cd-like)",
+    args: [{ name: "path", required: true, placeholder: ".. | demo_123" }],
+    run: (argv) => {
+      const target = parseFlags(argv).positionals[0];
+      if (!target) return err("missing path", "e.g. forge switch demo_123  ·  forge switch ..");
+      const dir = path.resolve(getProjectRoot(), target);
+      if (!fs.existsSync(dir)) return err(`no such directory: ${target}`);
+      setProjectRoot(dir);
+      const c = loadForgeYaml();
+      if (!c) return { ok: true, lines: [{ text: `switched to ${dir}`, tone: "warn" }, { text: "  no project here — forge init to create one", tone: "dim" }] };
+      return ok({ text: `✓ switched to "${c.project}"`, tone: "ok" }, { text: `  ${dir}`, tone: "dim" });
+    },
+  },
+  {
+    name: "project",
+    summary: "show the current project + directory",
+    run: () => {
+      const c = loadForgeYaml();
+      if (!c) return ok({ text: `no project · ${getProjectRoot()}`, tone: "dim" });
+      return ok({ text: `${c.project} · ${c.mode}`, tone: "info" }, { text: `  ${getProjectRoot()}`, tone: "dim" });
     },
   },
   {

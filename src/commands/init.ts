@@ -1,8 +1,10 @@
 // `forge init` — see docs/05-CLI-UX-SPEC.md.
 
 import readline from "node:readline/promises";
+import fs from "node:fs";
+import path from "node:path";
 import * as ui from "../core/ui.js";
-import { forgeYamlExists, saveForgeYaml, ensureForgeDirs } from "../core/store.js";
+import { forgeYamlExists, saveForgeYaml, ensureForgeDirs, getProjectRoot, setProjectRoot } from "../core/store.js";
 import { detectProject } from "../core/detect.js";
 import type { ForgeConfig, PolicyPreset } from "../types.js";
 
@@ -29,21 +31,27 @@ async function prompt(question: string, defaultValue: string): Promise<string> {
 }
 
 export async function init(options: InitOptions): Promise<void> {
-  if (forgeYamlExists() && !options.force) {
-    ui.errorBox(
-      "forge.yaml already exists",
-      "pass --force to overwrite, or remove it manually first"
-    );
-    process.exitCode = 1;
-    return;
-  }
-
   console.log();
   const projectName = options.name ?? (await prompt("project name:", "my-project"));
   const stack = options.stack ?? (await prompt("stack (free text, just a label):", "Node.js"));
   const policyPreset = normalizePreset(
     options.policy ?? (await prompt("policy preset: (default/strict/soc2/hipaa)", "default"))
   );
+
+  // If a project already exists here, scaffold the new one in ./<name>/ instead
+  // of erroring — so `forge init <name>` from within a project makes a fresh one.
+  let inSubdir = false;
+  if (forgeYamlExists() && !options.force) {
+    const sub = path.join(getProjectRoot(), projectName);
+    if (fs.existsSync(path.join(sub, "forge.yaml"))) {
+      ui.errorBox(`project "${projectName}" already exists`, "pick another name, or pass --force");
+      process.exitCode = 1;
+      return;
+    }
+    fs.mkdirSync(sub, { recursive: true });
+    setProjectRoot(sub);
+    inSubdir = true;
+  }
 
   // soc2/hipaa never auto-continue past a hard block (see policy spec §preset map).
   const onBlock = policyPreset === "soc2" || policyPreset === "hipaa" ? "stop_run" : "notify_agent";
@@ -82,14 +90,14 @@ export async function init(options: InitOptions): Promise<void> {
   };
 
   // Auto-configure a real-run target from the project we're initialized in.
-  const detected = detectProject(process.cwd());
+  const detected = detectProject(getProjectRoot());
   if (detected.target) config.target = detected.target;
 
   ensureForgeDirs();
   saveForgeYaml(config);
 
   console.log();
-  ui.ok("forge.yaml created");
+  ui.ok(`forge.yaml created${inSubdir ? ` in ./${projectName}/` : ""}`);
   ui.ok(".forge/ directory scaffolded");
   if (detected.target) ui.ok(detected.note);
   else ui.dim(`  ${detected.note}`);
