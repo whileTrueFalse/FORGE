@@ -7,7 +7,7 @@
 
 import { Box, Text, useApp, useInput } from "ink";
 import { useMemo, useRef, useState } from "react";
-import { Panel, StatRow, theme } from "../tui/components.js";
+import { StatRow, theme } from "../tui/components.js";
 import { TAGLINE, MARK } from "../tui/brand.js";
 import { RunView } from "./RunView.js";
 import { GuideView } from "./GuideView.js";
@@ -94,26 +94,28 @@ function flattenTranscript(entries: Entry[]): React.JSX.Element[] {
   const out: React.JSX.Element[] = [];
   for (const e of entries) {
     if (e.type === "banner") {
-      // Compact wordmark (Ember) — no giant ASCII in the shell.
+      // Compact wordmark (Ember) — stacked like the mockup.
       out.push(
-        <Text key={`bm${e.id}`}>
-          <Text color={theme.brand} bold>
-            {MARK} FORGE
-          </Text>
-          <Text color={theme.muted}>{"   " + TAGLINE}</Text>
+        <Text key={`bm${e.id}`} color={theme.brand} bold>
+          {MARK} FORGE
+        </Text>
+      );
+      out.push(
+        <Text key={`bt${e.id}`} color={theme.muted}>
+          {TAGLINE}
         </Text>
       );
       out.push(
         <Text key={`bh${e.id}`} color={theme.dim}>
-          New here? Type <Text color={theme.accent}>forge guide</Text>. Type <Text color={theme.accent}>forge</Text> to see commands.
+          New here? Type <Text color={theme.accent}>forge guide</Text>  ·  Type <Text color={theme.accent}>forge</Text> to see commands.
         </Text>
       );
       out.push(<Text key={`bg${e.id}`}> </Text>);
     } else {
       out.push(
         <Text key={`c${e.id}`}>
-          <Text color={theme.accent}>› </Text>
-          <Text color={theme.text}>{e.command}</Text>
+          <Text color={theme.dim}>› </Text>
+          <Text color={theme.accent}>{e.command}</Text>
         </Text>
       );
       e.lines.forEach((l, i) =>
@@ -391,11 +393,10 @@ export function Shell(): React.JSX.Element {
     return <FormView title={form.prefix} fields={form.fields} onComplete={completeForm} onCancel={cancelForm} />;
   }
 
-  // ── full-screen layout sizing ──────────────────────────────────────
-  const suggH = sug.items.length > 0 ? Math.min(8, sug.items.length) + 2 : sug.context === "args" && sug.argHint ? 1 : 0;
-  const bottomH = suggH + 3; // status + input + keybar
-  const bodyH = Math.max(6, rows - 3 - bottomH);
-  const maxLines = Math.max(3, bodyH - 2);
+  // ── layout sizing (edge-divider bars) ──────────────────────────────
+  const paletteH = sug.items.length > 0 ? Math.min(8, sug.items.length) + 3 : sug.context === "args" && sug.argHint ? 1 : 0;
+  const bodyH = Math.max(6, rows - 2 /*topbar*/ - paletteH - 2 /*cmd*/ - 2 /*status*/);
+  const maxLines = Math.max(3, bodyH - 1);
   const shownLines = flattenTranscript(entries).slice(-maxLines);
 
   const before = input.slice(0, cursor);
@@ -404,69 +405,92 @@ export function Shell(): React.JSX.Element {
 
   return (
     <Box flexDirection="column" width={columns} height={rows}>
-      {/* Header */}
-      <Box borderStyle="single" borderColor={theme.border} paddingX={1} justifyContent="space-between">
+      {/* Topbar — bottom divider only */}
+      <Box borderStyle="single" borderTop={false} borderLeft={false} borderRight={false} borderColor={theme.border} paddingX={1} justifyContent="space-between">
         <Text>
           <Text color={theme.brand} bold>{MARK} FORGE</Text>
-          <Text color={theme.border}>{"   │   "}</Text>
-          <Text color={theme.text}>{ws ? ws.project : "no project"}</Text>
+          <Text color={theme.sep}>{"   │   "}</Text>
+          <Text color={theme.textSoft}>{ws ? ws.project : "no project"}</Text>
         </Text>
-        <Text color={theme.dim}>{ws ? `${ws.mode}  ·  ${ws.policy}  ·  ${ws.runs} runs` : "type forge init to begin"}</Text>
+        {ws ? (
+          <Text>
+            <Text color={theme.label}>{ws.mode}</Text>
+            <Text color={theme.sep}>{"  ·  "}</Text>
+            <Text color={theme.label}>{ws.policy}</Text>
+            <Text color={theme.sep}>{"  ·  "}</Text>
+            <Text color={theme.label}>{`${ws.runs} runs`}</Text>
+          </Text>
+        ) : (
+          <Text color={theme.label}>type forge init to begin</Text>
+        )}
       </Box>
 
-      {/* Body: sidebar + activity */}
+      {/* Body — sidebar (right divider) + activity */}
       <Box height={bodyH} flexDirection="row">
-        <Panel title="Setup" width={32}>
-          <Checklist steps={steps} />
+        <Box width={30} borderStyle="single" borderTop={false} borderBottom={false} borderLeft={false} borderColor={theme.border} paddingX={1} paddingTop={1} flexDirection="column">
+          <Text color={theme.label}>SETUP</Text>
           <Box marginTop={1} flexDirection="column">
-            <Text color={theme.title}>WORKSPACE</Text>
-            <StatRow label="db" value={ws?.db ?? "—"} color={ws && ws.db !== "none" ? theme.pass : theme.dim} />
-            <StatRow label="mocks" value={ws?.mocks ?? "—"} />
-            <StatRow label="agent" value={ws?.agent ?? "—"} />
+            <Checklist steps={steps} />
           </Box>
-        </Panel>
+          <Box marginTop={1} flexDirection="column">
+            <Text color={theme.label}>WORKSPACE</Text>
+            <StatRow label="db" value={ws?.db ?? "none"} color={ws && ws.db !== "none" ? theme.info : theme.faint} />
+            <StatRow label="mocks" value={ws?.mocks ?? "none"} color={ws && ws.mocks !== "none" ? theme.info : theme.faint} />
+            <StatRow label="agent" value={ws?.agent ?? "none"} color={ws && ws.agent !== "none" ? theme.info : theme.faint} />
+          </Box>
+        </Box>
 
-        <Panel title="Activity" flexGrow={1}>
+        <Box flexGrow={1} paddingX={1} paddingTop={1} flexDirection="column">
           {shownLines}
-        </Panel>
+        </Box>
       </Box>
 
-      {/* Bottom: suggestions + input + keybar */}
-      <Box flexDirection="column">
-        {sug.items.length > 0 ? (
-          <Box flexDirection="column" borderStyle="single" borderColor={theme.border} paddingX={1}>
-            {sug.items.slice(0, 8).map((it, i) => (
-              <Text key={it.token} backgroundColor={i === selClamped ? "#241d12" : undefined}>
-                <Text color={i === selClamped ? theme.accent : theme.muted}>
-                  {(i === selClamped ? "▸ " : "  ") + "forge " + it.token}
-                </Text>
-                <Text color={theme.dim}>{"  ·  " + it.summary}</Text>
+      {/* Autocomplete palette */}
+      {sug.items.length > 0 ? (
+        <Box flexDirection="column" borderStyle="single" borderColor={theme.border} paddingX={1}>
+          <Text>
+            <Text color={theme.accent}>forge</Text>
+            <Text color={theme.dim}>{"  — commands"}</Text>
+          </Text>
+          {sug.items.slice(0, 8).map((it, i) => (
+            <Box key={it.token} justifyContent="space-between">
+              <Text backgroundColor={i === selClamped ? theme.sel : undefined} color={i === selClamped ? theme.accent : theme.info}>
+                {(i === selClamped ? "▸ " : "  ") + "forge " + it.token}
               </Text>
-            ))}
-          </Box>
-        ) : sug.context === "args" && sug.argHint ? (
-          <Text color={theme.dim}>  {sug.argHint}</Text>
-        ) : null}
-
-        <Box>
-          <Text color={theme.accent}>{"› "}</Text>
-          <Text color={theme.text}>{before}</Text>
-          <Text backgroundColor={theme.accent} color="#0d0c0b">{cursorChar}</Text>
-          <Text color={theme.text}>{after}</Text>
+              <Text color={theme.dim}>{it.summary}</Text>
+            </Box>
+          ))}
         </Box>
+      ) : sug.context === "args" && sug.argHint ? (
+        <Box paddingX={1}>
+          <Text color={theme.dim}>{sug.argHint}</Text>
+        </Box>
+      ) : null}
 
-        <Box>
-          <Text color={theme.key}>⏎</Text>
-          <Text color={theme.dim}> run/next    </Text>
-          <Text color={theme.key}>Tab</Text>
-          <Text color={theme.dim}> complete    </Text>
-          <Text color={theme.key}>↑↓</Text>
-          <Text color={theme.dim}> history    </Text>
-          <Text color={theme.key}>forge guide</Text>
-          <Text color={theme.dim}> help    </Text>
+      {/* Command bar — top divider */}
+      <Box borderStyle="single" borderBottom={false} borderLeft={false} borderRight={false} borderColor={theme.border} paddingX={1}>
+        <Text color={theme.accent}>{"› "}</Text>
+        <Text color={theme.text}>{before}</Text>
+        <Text backgroundColor={theme.accent} color="#0d0c0b">{cursorChar}</Text>
+        <Text color={theme.text}>{after}</Text>
+      </Box>
+
+      {/* Status bar — fainter top divider */}
+      <Box borderStyle="single" borderBottom={false} borderLeft={false} borderRight={false} borderColor={theme.borderFaint} paddingX={1} justifyContent="space-between">
+        <Text>
+          <Text color={theme.navKey}>⏎</Text>
+          <Text color={theme.faint}> run/next{"     "}</Text>
+          <Text color={theme.accent}>Tab</Text>
+          <Text color={theme.faint}> complete{"     "}</Text>
+          <Text color={theme.navKey}>↑↓</Text>
+          <Text color={theme.faint}> history{"     "}</Text>
+          <Text color={theme.accent}>forge guide</Text>
+          <Text color={theme.faint}> help</Text>
+        </Text>
+        <Text>
           <Text color={theme.block}>Ctrl-C</Text>
-          <Text color={theme.dim}> exit</Text>
-        </Box>
+          <Text color={theme.faint}> exit</Text>
+        </Text>
       </Box>
     </Box>
   );
