@@ -50,8 +50,8 @@ test("TUI: welcome screen mounts with branding and session overview", () => {
   const engine = new RunEngine({ runId: "run-1", task: "add coupon validation", agent: config.agents[0], config, exitOnBlock: false });
   const { lastFrame, unmount } = render(<App engine={engine} config={config} task="add coupon validation" />);
   const frame = lastFrame() ?? "";
-  assert.match(frame, /This session/);
-  assert.match(frame, /How a run works/);
+  assert.match(frame, /this session/i);
+  assert.match(frame, /how a run works/i);
   assert.match(frame, /start run/); // key hint
   unmount();
 });
@@ -76,6 +76,6 @@ test("TUI: pressing enter starts the run and drives it to completion", async () 
   assert.equal(timedOut, false);
   const frame = lastFrame() ?? "";
   assert.match(frame, /RUN COMPLETE/);
-  assert.match(frame, /Live Policy Log/);
+  assert.match(frame, /live policy log/i);
   unmount();
 });

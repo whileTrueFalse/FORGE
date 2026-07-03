@@ -8,7 +8,7 @@
 import { Box, Text, useApp, useInput } from "ink";
 import { useMemo, useRef, useState } from "react";
 import { Panel, StatRow, theme } from "../tui/components.js";
-import { TAGLINE, FORGE_LOGO, LOGO_GRADIENT } from "../tui/brand.js";
+import { TAGLINE, MARK } from "../tui/brand.js";
 import { RunView } from "./RunView.js";
 import { GuideView } from "./GuideView.js";
 import { FormView } from "./FormView.js";
@@ -49,8 +49,8 @@ const toneColor: Record<Tone, string | undefined> = {
   err: theme.block,
   info: theme.info,
   dim: theme.dim,
-  plain: undefined,
-  head: theme.title,
+  plain: theme.text,
+  head: theme.accent,
 };
 
 function isExecutable(line: string): boolean {
@@ -94,34 +94,31 @@ function flattenTranscript(entries: Entry[]): React.JSX.Element[] {
   const out: React.JSX.Element[] = [];
   for (const e of entries) {
     if (e.type === "banner") {
-      FORGE_LOGO.forEach((ln, i) =>
-        out.push(
-          <Text key={`b${e.id}-${i}`} color={LOGO_GRADIENT[i] ?? theme.brand} bold>
-            {ln}
-          </Text>
-        )
-      );
+      // Compact wordmark (Ember) — no giant ASCII in the shell.
       out.push(
-        <Text key={`bt${e.id}`} color={theme.brand}>
-          {TAGLINE}
+        <Text key={`bm${e.id}`}>
+          <Text color={theme.brand} bold>
+            {MARK} FORGE
+          </Text>
+          <Text color={theme.muted}>{"   " + TAGLINE}</Text>
         </Text>
       );
       out.push(
-        <Text key={`bh${e.id}`} dimColor>
-          New here? Type forge guide. Type forge to see commands.
+        <Text key={`bh${e.id}`} color={theme.dim}>
+          New here? Type <Text color={theme.accent}>forge guide</Text>. Type <Text color={theme.accent}>forge</Text> to see commands.
         </Text>
       );
       out.push(<Text key={`bg${e.id}`}> </Text>);
     } else {
       out.push(
         <Text key={`c${e.id}`}>
-          <Text color={theme.accent}>▌ </Text>
-          {e.command}
+          <Text color={theme.accent}>› </Text>
+          <Text color={theme.text}>{e.command}</Text>
         </Text>
       );
       e.lines.forEach((l, i) =>
         out.push(
-          <Text key={`l${e.id}-${i}`} color={toneColor[l.tone ?? "plain"]} dimColor={l.tone === "dim"} bold={l.tone === "head"}>
+          <Text key={`l${e.id}-${i}`} color={l.tone === "dim" ? theme.dim : toneColor[l.tone ?? "plain"]} bold={l.tone === "head"}>
             {l.text}
           </Text>
         )
@@ -408,12 +405,13 @@ export function Shell(): React.JSX.Element {
   return (
     <Box flexDirection="column" width={columns} height={rows}>
       {/* Header */}
-      <Box borderStyle="round" borderColor={theme.accent} paddingX={1} justifyContent="space-between">
+      <Box borderStyle="single" borderColor={theme.border} paddingX={1} justifyContent="space-between">
         <Text>
-          <Text color={theme.brand} bold>◆ FORGE</Text>
-          <Text dimColor>{`   ${ws ? ws.project : "no project"}`}</Text>
+          <Text color={theme.brand} bold>{MARK} FORGE</Text>
+          <Text color={theme.border}>{"   │   "}</Text>
+          <Text color={theme.text}>{ws ? ws.project : "no project"}</Text>
         </Text>
-        <Text dimColor>{ws ? `${ws.mode} · ${ws.policy} · runs ${ws.runs}` : "type forge init to begin"}</Text>
+        <Text color={theme.dim}>{ws ? `${ws.mode}  ·  ${ws.policy}  ·  ${ws.runs} runs` : "type forge init to begin"}</Text>
       </Box>
 
       {/* Body: sidebar + activity */}
@@ -421,7 +419,7 @@ export function Shell(): React.JSX.Element {
         <Panel title="Setup" width={32}>
           <Checklist steps={steps} />
           <Box marginTop={1} flexDirection="column">
-            <Text color={theme.accent} bold>workspace</Text>
+            <Text color={theme.title}>WORKSPACE</Text>
             <StatRow label="db" value={ws?.db ?? "—"} color={ws && ws.db !== "none" ? theme.pass : theme.dim} />
             <StatRow label="mocks" value={ws?.mocks ?? "—"} />
             <StatRow label="agent" value={ws?.agent ?? "—"} />
@@ -436,39 +434,38 @@ export function Shell(): React.JSX.Element {
       {/* Bottom: suggestions + input + keybar */}
       <Box flexDirection="column">
         {sug.items.length > 0 ? (
-          <Box flexDirection="column" borderStyle="round" borderColor={theme.border} paddingX={1}>
+          <Box flexDirection="column" borderStyle="single" borderColor={theme.border} paddingX={1}>
             {sug.items.slice(0, 8).map((it, i) => (
-              <Text key={it.token} color={i === selClamped ? theme.key : undefined} bold={i === selClamped}>
-                {i === selClamped ? "▸ " : "  "}
-                <Text>forge {it.token}</Text>
-                <Text dimColor>{"  ·  " + it.summary}</Text>
+              <Text key={it.token} backgroundColor={i === selClamped ? "#241d12" : undefined}>
+                <Text color={i === selClamped ? theme.accent : theme.muted}>
+                  {(i === selClamped ? "▸ " : "  ") + "forge " + it.token}
+                </Text>
+                <Text color={theme.dim}>{"  ·  " + it.summary}</Text>
               </Text>
             ))}
           </Box>
         ) : sug.context === "args" && sug.argHint ? (
-          <Text dimColor>  {sug.argHint}</Text>
+          <Text color={theme.dim}>  {sug.argHint}</Text>
         ) : null}
 
         <Box>
           <Text color={theme.accent}>{"› "}</Text>
-          <Text>{before}</Text>
-          <Text inverse>{cursorChar}</Text>
-          <Text>{after}</Text>
+          <Text color={theme.text}>{before}</Text>
+          <Text backgroundColor={theme.accent} color="#0d0c0b">{cursorChar}</Text>
+          <Text color={theme.text}>{after}</Text>
         </Box>
 
         <Box>
           <Text color={theme.key}>⏎</Text>
-          <Text dimColor> run/next   </Text>
+          <Text color={theme.dim}> run/next    </Text>
           <Text color={theme.key}>Tab</Text>
-          <Text dimColor> complete   </Text>
+          <Text color={theme.dim}> complete    </Text>
           <Text color={theme.key}>↑↓</Text>
-          <Text dimColor> history   </Text>
+          <Text color={theme.dim}> history    </Text>
           <Text color={theme.key}>forge guide</Text>
-          <Text dimColor> help   </Text>
-          <Text color={theme.block} bold>Ctrl-C</Text>
-          <Text dimColor> exit (or </Text>
-          <Text color={theme.key}>forge exit</Text>
-          <Text dimColor>)</Text>
+          <Text color={theme.dim}> help    </Text>
+          <Text color={theme.block}>Ctrl-C</Text>
+          <Text color={theme.dim}> exit</Text>
         </Box>
       </Box>
     </Box>

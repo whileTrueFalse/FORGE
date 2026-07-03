@@ -48,7 +48,7 @@ test("shell: first run shows the setup checklist with a next step", async () => 
   const { lastFrame, unmount } = render(<Shell />);
   await delay(60);
   const f = lastFrame() ?? "";
-  assert.match(f, /Setup/); // sidebar panel
+  assert.match(f, /setup/i); // sidebar panel (title is uppercased)
   assert.match(f, /project/); // checklist step
   assert.match(f, /next step/);
   unmount();

@@ -35,15 +35,16 @@ export function Checklist({ steps }: { steps: Step[] }): React.JSX.Element {
   return (
     <Box flexDirection="column">
       {steps.map((s) => (
-        <Text key={s.label} color={s.done ? theme.pass : theme.dim}>
-          {(s.done ? "✓ " : "○ ") + s.label}
+        <Text key={s.label}>
+          <Text color={s.done ? theme.pass : theme.dim}>{s.done ? "✓ " : "○ "}</Text>
+          <Text color={s.done ? theme.text : theme.muted}>{s.label}</Text>
         </Text>
       ))}
       <Box marginTop={1} flexDirection="column">
         {next ? (
           <Box flexDirection="column">
-            <Text dimColor>next step</Text>
-            <Text color={theme.key}>{next.next}</Text>
+            <Text color={theme.dim}>next step</Text>
+            <Text color={theme.accent}>{next.next}</Text>
           </Box>
         ) : (
           <Text color={theme.pass}>✓ ready — {runCmd}</Text>

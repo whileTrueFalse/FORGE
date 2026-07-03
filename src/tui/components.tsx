@@ -31,7 +31,7 @@ export function Panel(props: {
 }): React.JSX.Element {
   return (
     <Box
-      borderStyle="round"
+      borderStyle="single"
       borderColor={props.borderColor ?? theme.border}
       flexDirection="column"
       paddingX={1}
@@ -39,8 +39,8 @@ export function Panel(props: {
       flexGrow={props.flexGrow}
       minHeight={props.minHeight}
     >
-      <Text color={props.titleColor ?? theme.title} bold>
-        {props.title}
+      <Text color={props.titleColor ?? theme.title}>
+        {props.title.toUpperCase()}
       </Text>
       <Box flexDirection="column" marginTop={1}>
         {props.children}
@@ -66,8 +66,8 @@ export function StatRow(props: {
 }): React.JSX.Element {
   return (
     <Box justifyContent="space-between" marginTop={props.marginTop}>
-      <Text dimColor>{props.label}</Text>
-      <Text color={props.color}>{props.value}</Text>
+      <Text color={theme.dim}>{props.label}</Text>
+      <Text color={props.color ?? theme.info}>{props.value}</Text>
     </Box>
   );
 }
@@ -79,7 +79,7 @@ export function Bar(props: { value: number; width?: number; color?: string }): R
   return (
     <Text>
       <Text color={props.color}>{"▓".repeat(filled)}</Text>
-      <Text dimColor>{"░".repeat(width - filled)}</Text>
+      <Text color={theme.border}>{"░".repeat(width - filled)}</Text>
     </Text>
   );
 }
