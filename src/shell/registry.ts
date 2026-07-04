@@ -68,6 +68,8 @@ export interface FormField {
   choices?: string[];
   /** optional description shown for the highlighted choice. */
   choiceHelp?: Record<string, string>;
+  /** one-line explanation of what this field is, shown under the label. */
+  help?: string;
   default?: string;
 }
 export type Handler = (argv: string[]) => CommandResult | Promise<CommandResult>;
@@ -213,8 +215,8 @@ export const COMMANDS: Command[] = [
         summary: "register a connector + generate synthetic rows",
         args: [{ name: "connectionString", required: true, placeholder: "postgres://host:5432/db" }],
         form: [
-          { key: "connectionString", label: "connection string", placeholder: "postgres://localhost:5432/acme_prod", required: true },
-          { key: "--rows", label: "synthetic rows", default: "50000" },
+          { key: "connectionString", label: "connection string", help: "your database URL — Forge reads only the schema shape, never real rows", placeholder: "postgres://localhost:5432/acme_prod", required: true },
+          { key: "--rows", label: "synthetic rows", help: "how many fake rows to seed the sandbox with", default: "50000" },
         ],
         run: (argv) => {
           const c = loadForgeYaml();
@@ -322,8 +324,8 @@ export const COMMANDS: Command[] = [
         summary: "register a sim from a file or inline persona",
         args: [{ name: "--file or --user-type", placeholder: "--user-type expired_card --count 500" }],
         form: [
-          { key: "--user-type", label: "persona / user type", placeholder: "expired_card_with_coupon", required: true },
-          { key: "--count", label: "sessions", default: "500" },
+          { key: "--user-type", label: "persona / user type", help: "a kind of user to simulate — drives synthetic traffic at your app", placeholder: "expired_card_with_coupon", required: true },
+          { key: "--count", label: "sessions", help: "how many simulated users of this persona to run", default: "500" },
         ],
         run: (argv) => {
           const c = loadForgeYaml();
@@ -375,9 +377,9 @@ export const COMMANDS: Command[] = [
     summary: "attach an AI agent + write scope",
     args: [{ name: "agent", required: true, placeholder: "cursor --scope ./src/**" }],
     form: [
-      { key: "agent", label: "agent", choices: ["cursor", "claude-code", "copilot", "windsurf"], default: "cursor" },
-      { key: "--scope", label: "write scope (glob)", placeholder: "./src/checkout/**", required: true },
-      { key: "--exec", label: "command to run in the box (optional)", placeholder: "node agent-task.mjs" },
+      { key: "agent", label: "agent name", help: "a label for whoever/whatever runs in the box", choices: ["cursor", "claude-code", "copilot", "windsurf"], default: "cursor" },
+      { key: "--scope", label: "writable paths (glob)", help: "files the agent may write to — writes anywhere else are blocked. Use ./** for the whole project.", placeholder: "./src/checkout/**", required: true },
+      { key: "--exec", label: "command to run in the box", help: "the command Forge runs sandboxed on `forge run` (e.g. your agent/test/script)", placeholder: "node agent-task.mjs" },
     ],
     run: (argv) => {
       const c = loadForgeYaml();
@@ -408,9 +410,9 @@ export const COMMANDS: Command[] = [
         summary: "set the app start command + port",
         args: [{ name: "start", required: true, placeholder: 'node src/server.mjs --port 3000' }],
         form: [
-          { key: "start", label: "start command (direct node, e.g. node src/server.mjs)", placeholder: "node src/server.mjs", required: true },
-          { key: "--port", label: "port", default: "3000" },
-          { key: "--cwd", label: "app directory (optional)", placeholder: "examples/acme-checkout" },
+          { key: "start", label: "start command", help: "how Forge launches your app for --real runs (use a direct `node …`)", placeholder: "node src/server.mjs", required: true },
+          { key: "--port", label: "port", help: "the port your app listens on", default: "3000" },
+          { key: "--cwd", label: "app directory (optional)", help: "where to run the app from", placeholder: "examples/acme-checkout" },
         ],
         run: (argv) => {
           const c = loadForgeYaml();

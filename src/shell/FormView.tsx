@@ -61,8 +61,9 @@ export function FormView({
         </Text>
         <Box marginTop={1}>
           <Text bold>{field.label}</Text>
-          {field.required ? <Text color={theme.warn}> *</Text> : <Text dimColor> (optional)</Text>}
+          {field.required ? <Text color={theme.warn}> *</Text> : <Text color={theme.dim}> (optional)</Text>}
         </Box>
+        {field.help ? <Text color={theme.dim}>{field.help}</Text> : null}
         {field.choices ? (
           <Box flexDirection="column" marginTop={1}>
             {field.choices.map((c, i) => (
