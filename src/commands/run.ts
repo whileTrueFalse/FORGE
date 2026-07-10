@@ -1,12 +1,13 @@
 // `forge run` — see docs/05-CLI-UX-SPEC.md.
 
 import * as ui from "../core/ui.js";
-import { loadForgeYaml, loadState, nextRunId, saveRun, saveDiffPatch } from "../core/store.js";
+import { loadForgeYaml, nextRunId, saveRun, saveDiffPatch } from "../core/store.js";
 import { executeRun } from "../core/runner.js";
 import { attachPlainRenderer } from "../core/plainRenderer.js";
 import { buildPatchText } from "../core/diffFormat.js";
 import { RealRunEngine } from "../engine/realRun.js";
 import { dockerAvailable } from "../engine/backends/postgres.js";
+import { freeFlowAgent } from "../core/freeFlow.js";
 import type { PolicyPreset } from "../types.js";
 
 interface RunOptions {
@@ -62,15 +63,8 @@ export async function run(options: RunOptions): Promise<void> {
     return;
   }
 
-  const state = loadState();
-  if (!state.attachedAgent || config.agents.length === 0) {
-    ui.errorBox(
-      "no agent attached",
-      "run `forge attach <agent> --scope <glob>` first"
-    );
-    process.exitCode = 1;
-    return;
-  }
+  // Free-flow: no agent required. If none is attached, run with a full-scope
+  // default so nothing blocks the run (see core/freeFlow.ts).
 
   // Per-run policy override (does not mutate forge.yaml on disk).
   if (options.policy) {
@@ -86,7 +80,7 @@ export async function run(options: RunOptions): Promise<void> {
     ui.dim(`  policy override: ${options.policy} (this run only)`);
   }
 
-  const agent = config.agents[0];
+  const agent = config.agents[0] ?? freeFlowAgent();
   const task = options.task ?? "add coupon validation to checkout";
   const runId = nextRunId();
 

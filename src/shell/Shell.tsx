@@ -25,6 +25,7 @@ import {
 } from "./registry.js";
 import { computeSuggestions, applyCompletion } from "./suggest.js";
 import { loadForgeYaml, loadState, listRuns, nextRunId, saveRun, saveDiffPatch } from "../core/store.js";
+import { freeFlowAgent } from "../core/freeFlow.js";
 import { buildPatchText } from "../core/diffFormat.js";
 import { RunEngine, type RunSource } from "../core/runEngine.js";
 import { RealRunEngine } from "../engine/realRun.js";
@@ -149,6 +150,7 @@ export function Shell(): React.JSX.Element {
   const selClamped = Math.min(sel, Math.max(0, sug.items.length - 1));
   const steps = useMemo(() => getSteps(), [entries.length, mode]);
   const ws = useMemo(() => readWorkspace(), [entries.length, mode]);
+  const shellMode = useMemo(() => loadState().shellMode ?? "guided", [entries.length, mode]);
 
   const append = (entry: NewEntry) => setEntries((prev) => [...prev, { ...entry, id: idRef.current++ } as Entry]);
   const pushResult = (command: string, lines: OutLine[], ok: boolean) => append({ type: "result", command, lines, ok });
@@ -161,12 +163,10 @@ export function Shell(): React.JSX.Element {
   const launchRun = (task: string) => {
     const config = loadForgeYaml();
     if (!config) return pushResult("forge run", [{ text: "✗ no project — run forge init first", tone: "err" }], false);
-    const state = loadState();
-    if (!state.attachedAgent || config.agents.length === 0) {
-      return pushResult("forge run", [{ text: "✗ no agent attached — forge attach <agent> --scope <glob>", tone: "err" }], false);
-    }
+    // Free-flow: no agent required — default to full scope when none attached.
+    const agent = config.agents[0] ?? freeFlowAgent();
     const runId = nextRunId();
-    const engine = new RunEngine({ runId, task, agent: config.agents[0], config, exitOnBlock: false });
+    const engine = new RunEngine({ runId, task, agent, config, exitOnBlock: false });
     engine.once("done", (outcome) => {
       const o = outcome as { record: RunRecord };
       saveRun(o.record);
@@ -185,9 +185,6 @@ export function Shell(): React.JSX.Element {
         { text: "✗ no target app set — run `forge target set` first", tone: "err" },
         { text: "  (the app Forge launches under the hook and drives for real)", tone: "dim" },
       ], false);
-    }
-    if (config.agents.length === 0) {
-      return pushResult("forge run --real", [{ text: "✗ no agent attached — forge attach <agent> --scope <glob>", tone: "err" }], false);
     }
     const runId = nextRunId();
     // Default to the in-process pglite backend — no Docker required.
@@ -419,6 +416,8 @@ export function Shell(): React.JSX.Element {
             <Text color={theme.label}>{ws.policy}</Text>
             <Text color={theme.sep}>{"  ·  "}</Text>
             <Text color={theme.label}>{`${ws.runs} runs`}</Text>
+            <Text color={theme.sep}>{"  ·  "}</Text>
+            <Text color={shellMode === "free" ? theme.accent : theme.label}>{shellMode}</Text>
           </Text>
         ) : (
           <Text color={theme.label}>type forge init to begin</Text>
@@ -428,11 +427,15 @@ export function Shell(): React.JSX.Element {
       {/* Body — sidebar (right divider) + activity */}
       <Box height={bodyH} flexDirection="row">
         <Box width={30} borderStyle="single" borderTop={false} borderBottom={false} borderLeft={false} borderColor={theme.border} paddingX={1} paddingTop={1} flexDirection="column">
-          <Text color={theme.label}>SETUP</Text>
-          <Box marginTop={1} flexDirection="column">
-            <Checklist steps={steps} />
-          </Box>
-          <Box marginTop={1} flexDirection="column">
+          {shellMode === "guided" ? (
+            <>
+              <Text color={theme.label}>SETUP</Text>
+              <Box marginTop={1} flexDirection="column">
+                <Checklist steps={steps} />
+              </Box>
+            </>
+          ) : null}
+          <Box marginTop={shellMode === "guided" ? 1 : 0} flexDirection="column">
             <Text color={theme.label}>WORKSPACE</Text>
             <StatRow label="db" value={ws?.db ?? "none"} color={ws && ws.db !== "none" ? theme.info : theme.faint} />
             <StatRow label="mocks" value={ws?.mocks ?? "none"} color={ws && ws.mocks !== "none" ? theme.info : theme.faint} />

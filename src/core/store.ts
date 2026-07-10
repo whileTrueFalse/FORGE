@@ -59,6 +59,8 @@ export interface ForgeState {
   };
   lastRunId?: string;
   runCounter: number;
+  /** shell UX: "guided" shows the setup checklist; "free" hides it. */
+  shellMode?: "guided" | "free";
 }
 
 const DEFAULT_STATE: ForgeState = { runCounter: 0 };

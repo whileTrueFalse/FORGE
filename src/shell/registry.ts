@@ -202,7 +202,8 @@ export const COMMANDS: Command[] = [
       const lines: OutLine[] = [{ text: `✓ project "${name}" created${inSubdir ? ` in ./${name}/` : ""} · policy ${preset}`, tone: "ok" }];
       if (inSubdir) lines.push({ text: `  switched here — \`forge switch ..\` to go back`, tone: "dim" });
       if (detected.target) lines.push({ text: `✓ ${detected.note}`, tone: "ok" });
-      lines.push({ text: "next: forge db link  ·  forge mock add  ·  forge attach", tone: "dim" });
+      lines.push({ text: 'run anything now:  forge box "<command>"', tone: "dim" });
+      lines.push({ text: "or wire connectors, in any order:  forge db link · forge mock add · forge attach", tone: "dim" });
       return { ok: true, lines };
     },
   },
@@ -636,6 +637,41 @@ export const COMMANDS: Command[] = [
         },
       },
     ],
+  },
+  {
+    name: "mode",
+    summary: "toggle guided checklist vs free-flow",
+    args: [{ name: "guided|free", placeholder: "free" }],
+    run: (argv) => {
+      const want = parseFlags(argv).positionals[0]?.toLowerCase();
+      const st = loadState();
+      if (!want) {
+        const cur = st.shellMode ?? "guided";
+        return ok(
+          { text: `mode: ${cur}`, tone: "info" },
+          {
+            text: cur === "guided"
+              ? "  guided — setup checklist + next-step hints on the left"
+              : "  free — no checklist; run anything, wire connectors if/when you want",
+            tone: "dim",
+          },
+          { text: "  switch:  forge mode free  ·  forge mode guided", tone: "dim" }
+        );
+      }
+      if (want !== "guided" && want !== "free") return err(`unknown mode: ${want}`, "use: forge mode guided | free");
+      st.shellMode = want;
+      ensureForgeDirs(); // mode can be set before `forge init`; make sure .forge/ exists
+      saveState(st);
+      return ok(
+        { text: `✓ mode → ${want}`, tone: "ok" },
+        {
+          text: want === "free"
+            ? '  checklist hidden — full control. `forge box "<command>"` runs anything.'
+            : "  guided checklist back on — next-step hints restored.",
+          tone: "dim",
+        }
+      );
+    },
   },
   { name: "guide", summary: "open the Forge user guide", special: "guide" },
   { name: "help", summary: "list all commands", run: () => helpResult() },
