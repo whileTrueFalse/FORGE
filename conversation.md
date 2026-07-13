@@ -65,8 +65,8 @@ Tagline: *"The execution boundary between your AI agent and production."*
   command, but sim numbers are synthetic/absent. **Do not present these as real.**
 - `forge attach <agent>`: records intent only — does **not** spawn/wrap the agent.
   The genuine execution path is `forge box "<cmd>"` / `--exec`.
-- Interception coverage today: **Node.js only · `pg` only · `http`/`https` only.**
-  No `fetch`/undici, no mysql/mongo, no non-Node runtimes.
+- Interception coverage today: **Node.js only · `pg` only · `http`/`https` + `fetch`/undici.**
+  No mysql/mongo, no non-Node runtimes. (fetch added 2026-07-13, task #1.)
 
 ---
 
@@ -120,7 +120,7 @@ Tracked in the session task list. Priority order:
 | # | Task | Bucket | Status |
 |---|---|---|---|
 | 7 | CI workflow (tsc + tests on push/PR) | infra — do first (guards the rest) | ✅ done |
-| 1 | Intercept `fetch`/undici outbound HTTP | 🔴 beta-gate | pending |
+| 1 | Intercept `fetch`/undici outbound HTTP | 🔴 beta-gate | ✅ done |
 | 2 | Harden DB connection rerouting to sandbox | 🔴 beta-gate | pending |
 | 3 | Harden SQL parsing in the policy path | 🟠 beta-gate | pending |
 | 4 | Tests for free-flow runs + mode toggle | 🟡 lock-in | pending |
@@ -152,4 +152,8 @@ Tracked in the session task list. Priority order:
 - Beta-readiness gap analysis completed (section 5).
 - Created this doc.
 - **Task #7 done:** added `.github/workflows/ci.yml` (typecheck + test matrix over
-  ubuntu/windows × node 20/22) + README CI badge. tsc clean, 51 tests pass. Next: #1 (fetch interception).
+  ubuntu/windows × node 20/22) + README CI badge. tsc clean, 51 tests pass.
+- **Task #1 done:** `patchFetch.ts` wraps global `fetch` (undici) — block unmocked /
+  redirect mocked / pass relative — wired into `preload.ts`; 5 new tests. 56 tests pass.
+  Note: covered by unit + wiring tests (parity with how patchHttp is tested); no spawned
+  e2e for fetch yet. Next: #2 (DB connection rerouting).

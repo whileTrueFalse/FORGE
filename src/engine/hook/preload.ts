@@ -8,6 +8,7 @@
 import { readHookConfig, emitOp, emitLog, emitReady } from "./ipc.js";
 import { installPgPatch } from "./patchPg.js";
 import { installHttpPatch } from "./patchHttp.js";
+import { installFetchPatch } from "./patchFetch.js";
 import { installFsPatch } from "./patchFs.js";
 import { buildKnownMocksMap } from "../../core/policyEngine.js";
 import type { InterceptDeps } from "./intercept.js";
@@ -29,9 +30,10 @@ function main(): void {
 
   const pg = installPgPatch(deps);
   installHttpPatch(deps, config.hostRedirects);
+  const fetchPatched = installFetchPatch(deps, config.hostRedirects);
   installFsPatch(deps);
 
-  emitLog("info", `forge hook installed (pg=${pg}, db=${config.dbUrl ? "sandbox" : "none"})`);
+  emitLog("info", `forge hook installed (pg=${pg}, fetch=${fetchPatched}, db=${config.dbUrl ? "sandbox" : "none"})`);
   // App finishes booting after this require returns; signal readiness on next tick.
   process.nextTick(emitReady);
 }
