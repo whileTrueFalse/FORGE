@@ -28,7 +28,7 @@ function main(): void {
     emit: emitOp,
   };
 
-  const pg = installPgPatch(deps);
+  const pg = installPgPatch(deps, config.dbUrl);
   installHttpPatch(deps, config.hostRedirects);
   const fetchPatched = installFetchPatch(deps, config.hostRedirects);
   installFsPatch(deps);

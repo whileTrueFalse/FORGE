@@ -121,7 +121,7 @@ Tracked in the session task list. Priority order:
 |---|---|---|---|
 | 7 | CI workflow (tsc + tests on push/PR) | infra — do first (guards the rest) | ✅ done |
 | 1 | Intercept `fetch`/undici outbound HTTP | 🔴 beta-gate | ✅ done |
-| 2 | Harden DB connection rerouting to sandbox | 🔴 beta-gate | pending |
+| 2 | Harden DB connection rerouting to sandbox | 🔴 beta-gate | ✅ done |
 | 3 | Harden SQL parsing in the policy path | 🟠 beta-gate | pending |
 | 4 | Tests for free-flow runs + mode toggle | 🟡 lock-in | pending |
 | 5 | Document free-flow model + `forge mode` | 🟡 lock-in | pending |
@@ -156,4 +156,12 @@ Tracked in the session task list. Priority order:
 - **Task #1 done:** `patchFetch.ts` wraps global `fetch` (undici) — block unmocked /
   redirect mocked / pass relative — wired into `preload.ts`; 5 new tests. 56 tests pass.
   Note: covered by unit + wiring tests (parity with how patchHttp is tested); no spawned
-  e2e for fetch yet. Next: #2 (DB connection rerouting).
+  e2e for fetch yet.
+- **Task #2 done:** `forcePgSandboxConnection` in `patchPg.ts` subclasses pg `Client`/`Pool`
+  so the constructor ignores app-hardcoded host/db and always uses the sandbox
+  `connectionString` (threaded via `installPgPatch(deps, config.dbUrl)` in preload). Closes
+  the bypass where `new Client({host:'prod'})` reached prod. +1 test, 57 pass.
+  **Residual gap (containment, out of scope):** covers CJS `require('pg')` + `new`
+  construction; a raw `net.connect` to a prod DB port, a non-`pg` driver, or ESM
+  live-binding edge cases still bypass — that's the in-process-patch limitation, not a
+  connection-rerouting bug. Next: #3 (SQL parsing hardening).

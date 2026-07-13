@@ -58,13 +58,43 @@ export function patchPgModule(pg: PgLikeModule, deps: InterceptDeps, file = "app
   }
 }
 
-/** Install the patch on the app's real `pg` module (best-effort). */
-export function installPgPatch(deps: InterceptDeps): boolean {
+type PgCtor = (new (...args: unknown[]) => unknown) & { __forgeConnForced?: boolean };
+
+/**
+ * Force every `pg` Client/Pool to connect to the sandbox, regardless of the
+ * host/port/database the app hardcodes. Query interception (patchPgModule) runs
+ * ON the connection, so if an app does `new Client({ host: "prod-db" })` its
+ * queries would still be enforced but hit the REAL database. Subclassing the
+ * constructors and ignoring the app-supplied config closes that bypass: the only
+ * database anything can reach is the sandbox. The subclasses inherit the already
+ * patched `query`, so enforcement is preserved.
+ */
+export function forcePgSandboxConnection(pg: PgLikeModule, sandboxUrl: string): void {
+  const mod = pg as unknown as Record<string, PgCtor | undefined>;
+  for (const key of ["Client", "Pool"] as const) {
+    const Original = mod[key];
+    if (typeof Original !== "function" || Original.__forgeConnForced) continue;
+    const Base = Original as unknown as { new (...a: unknown[]): object };
+    const Forced = class extends Base {
+      constructor(..._args: unknown[]) {
+        // Ignore whatever host/db the app asked for — always the sandbox.
+        super({ connectionString: sandboxUrl });
+      }
+    } as unknown as PgCtor;
+    Forced.__forgeConnForced = true;
+    mod[key] = Forced;
+  }
+}
+
+/** Install the patch on the app's real `pg` module (best-effort). When a sandbox
+ *  connection string is provided, also force every connection onto it. */
+export function installPgPatch(deps: InterceptDeps, sandboxUrl?: string): boolean {
   try {
     // require from the target app's module resolution, not forge's.
     const require = createRequire(process.cwd() + "/");
     const pg = require("pg") as PgLikeModule;
     patchPgModule(pg, deps);
+    if (sandboxUrl) forcePgSandboxConnection(pg, sandboxUrl);
     return true;
   } catch {
     return false; // app doesn't use pg, or it isn't resolvable

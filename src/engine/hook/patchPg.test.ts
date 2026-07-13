@@ -5,7 +5,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { resolvePolicyRules, buildKnownMocksMap, type PolicyEvalContext } from "../../core/policyEngine.js";
-import { patchPgModule, sqlFromQueryArgs } from "./patchPg.js";
+import { patchPgModule, sqlFromQueryArgs, forcePgSandboxConnection } from "./patchPg.js";
 import { ForgeBlockedError, type InterceptDeps } from "./intercept.js";
 import type { PolicyConfig } from "../../types.js";
 
@@ -58,4 +58,29 @@ test("patched pg: safe query passes through unchanged", async () => {
   const c = new C3();
   await c.query("SELECT id FROM orders WHERE user_id = ?");
   assert.equal(c.received.at(-1), "SELECT id FROM orders WHERE user_id = ?");
+});
+
+test("forced pg: a hardcoded prod host is ignored and rerouted to the sandbox", () => {
+  const SANDBOX = "postgres://postgres@127.0.0.1:5555/postgres";
+  class RecordingClient {
+    cfg: unknown;
+    constructor(cfg?: unknown) { this.cfg = cfg; }
+  }
+  class RecordingPool {
+    cfg: unknown;
+    constructor(cfg?: unknown) { this.cfg = cfg; }
+  }
+  const pg = { Client: RecordingClient, Pool: RecordingPool } as unknown as {
+    Client: new (c?: unknown) => { cfg: unknown };
+    Pool: new (c?: unknown) => { cfg: unknown };
+  };
+  forcePgSandboxConnection(pg, SANDBOX);
+
+  // App hardcodes a production connection — must be ignored.
+  const c = new pg.Client({ host: "prod-db.internal", port: 5432, database: "prod", user: "root" });
+  assert.deepEqual(c.cfg, { connectionString: SANDBOX });
+  assert.ok(c instanceof RecordingClient, "forced client is still a pg Client (subclass)");
+
+  const p = new pg.Pool({ host: "prod-db.internal" });
+  assert.deepEqual(p.cfg, { connectionString: SANDBOX });
 });
