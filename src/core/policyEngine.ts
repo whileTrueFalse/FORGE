@@ -2,6 +2,7 @@
 // See docs/06-POLICY-ENGINE-SPEC.md for the rule specification this
 // implements.
 
+import { splitSqlStatements } from "./sqlNormalize.js";
 import type {
   AgentOperation,
   PolicyConfig,
@@ -68,12 +69,17 @@ export function resolvePolicyRules(policy: PolicyConfig): ResolvedPolicy {
   };
 }
 
+// The SQL rules below match against `stmts` — the comment-stripped,
+// string-blanked, per-statement normalization from sqlNormalize.ts — so a rule
+// cannot be evaded by a comment, a string literal, or by hiding the offending
+// statement after a `;` in a multi-statement batch. Rewrites still use op.sql.
+
 /**
- * Rule 1: wildcard SELECT block.
+ * Rule 1: wildcard SELECT block. Fires if ANY statement selects `*`.
  */
-function checkWildcardSelect(op: AgentOperation, piiFields: string[]): PolicyVerdict | null {
+function checkWildcardSelect(op: AgentOperation, stmts: string[], piiFields: string[]): PolicyVerdict | null {
   if (op.kind !== "db_query" || !op.sql) return null;
-  if (!/select\s+\*/i.test(op.sql)) return null;
+  if (!stmts.some((s) => /select\s+\*/i.test(s))) return null;
 
   return {
     operation: op,
@@ -83,11 +89,11 @@ function checkWildcardSelect(op: AgentOperation, piiFields: string[]): PolicyVer
 }
 
 /**
- * Rule 2: destructive statement block (DROP TABLE / TRUNCATE).
+ * Rule 2: destructive statement block (DROP TABLE / TRUNCATE), any statement.
  */
-function checkDestructiveStatement(op: AgentOperation): PolicyVerdict | null {
+function checkDestructiveStatement(op: AgentOperation, stmts: string[]): PolicyVerdict | null {
   if (op.kind !== "db_query" || !op.sql) return null;
-  if (!/drop\s+table/i.test(op.sql) && !/truncate/i.test(op.sql)) return null;
+  if (!stmts.some((s) => /drop\s+table/i.test(s) || /truncate/i.test(s))) return null;
 
   return {
     operation: op,
@@ -97,14 +103,25 @@ function checkDestructiveStatement(op: AgentOperation): PolicyVerdict | null {
 }
 
 /**
- * Rule 3: unscoped UPDATE/DELETE → rewrite with a scoped WHERE clause.
+ * Rule 3: unscoped UPDATE/DELETE. A single unscoped mutation is rewritten with a
+ * scoped WHERE; an unscoped mutation buried in a multi-statement batch is blocked
+ * (too ambiguous to auto-fix, and multi-statement batches are an injection smell).
  */
-function checkUnscopedMutation(op: AgentOperation): PolicyVerdict | null {
+function checkUnscopedMutation(op: AgentOperation, stmts: string[]): PolicyVerdict | null {
   if (op.kind !== "db_query" || !op.sql) return null;
-  if (!/^\s*(update|delete)/i.test(op.sql)) return null;
-  if (/where/i.test(op.sql)) return null;
+  const unscoped = stmts.filter((s) => /^\s*(update|delete)\b/i.test(s) && !/\bwhere\b/i.test(s));
+  if (unscoped.length === 0) return null;
 
-  const rewrittenSql = `${op.sql.trim()} WHERE id = ? AND user_id = ?`;
+  if (stmts.length > 1) {
+    return {
+      operation: op,
+      verdict: "block",
+      reason: "unscoped UPDATE/DELETE in a multi-statement batch",
+    };
+  }
+
+  const base = op.sql.trim().replace(/;\s*$/, "");
+  const rewrittenSql = `${base} WHERE id = ? AND user_id = ?`;
   return {
     operation: op,
     verdict: "rewrite",
@@ -114,28 +131,30 @@ function checkUnscopedMutation(op: AgentOperation): PolicyVerdict | null {
 }
 
 /**
- * Rule 4: PII field allowlist on explicit-column SELECTs.
+ * Rule 4: PII field allowlist on explicit-column SELECTs, per statement.
  * Only active under strict/soc2/hipaa presets (gated by the resolved rule list).
  */
-function checkPiiFieldAllowlist(op: AgentOperation, piiFields: string[]): PolicyVerdict | null {
+function checkPiiFieldAllowlist(op: AgentOperation, stmts: string[], piiFields: string[]): PolicyVerdict | null {
   if (op.kind !== "db_query" || !op.sql) return null;
-
-  const match = op.sql.match(/^\s*select\s+(.+?)\s+from/i);
-  if (!match) return null;
-
-  const columns = match[1].split(",").map((c) => c.trim().toLowerCase());
   const piiLower = piiFields.map((f) => f.toLowerCase());
-  const exposed = columns.filter((c) => piiLower.includes(c));
-  if (exposed.length === 0) return null;
-  // A single-row id-scoped lookup is allowed even with PII fields in v0's simple heuristic.
-  if (/where\s+id\s*=\s*\?/i.test(op.sql)) return null;
 
-  return {
-    operation: op,
-    verdict: "rewrite",
-    reason: `explicit PII fields selected without row-scoped lookup (${exposed.join(", ")})`,
-    rewrittenOperation: op,
-  };
+  for (const s of stmts) {
+    const match = s.match(/^\s*select\s+(.+?)\s+from/i);
+    if (!match) continue;
+    const columns = match[1].split(",").map((c) => c.trim().toLowerCase());
+    const exposed = columns.filter((c) => piiLower.includes(c));
+    if (exposed.length === 0) continue;
+    // A single-row id-scoped lookup is allowed even with PII fields (v0 heuristic).
+    if (/\bwhere\s+id\s*=\s*\?/i.test(s)) continue;
+
+    return {
+      operation: op,
+      verdict: "rewrite",
+      reason: `explicit PII fields selected without row-scoped lookup (${exposed.join(", ")})`,
+      rewrittenOperation: op,
+    };
+  }
+  return null;
 }
 
 /**
@@ -222,11 +241,13 @@ export function evaluateOperation(
   ctx: PolicyEvalContext
 ): PolicyVerdict {
   const active = (id: PolicyRuleId) => policy.activeRules.includes(id);
+  // Normalize once (comment-stripped, string-blanked, per-statement) for all SQL rules.
+  const stmts = op.kind === "db_query" && op.sql ? splitSqlStatements(op.sql) : [];
   const checks: Array<() => PolicyVerdict | null> = [
-    () => (active("wildcard_select") ? checkWildcardSelect(op, policy.piiFields) : null),
-    () => (active("destructive") ? checkDestructiveStatement(op) : null),
-    () => (active("unscoped_mutation") ? checkUnscopedMutation(op) : null),
-    () => (active("pii_allowlist") ? checkPiiFieldAllowlist(op, policy.piiFields) : null),
+    () => (active("wildcard_select") ? checkWildcardSelect(op, stmts, policy.piiFields) : null),
+    () => (active("destructive") ? checkDestructiveStatement(op, stmts) : null),
+    () => (active("unscoped_mutation") ? checkUnscopedMutation(op, stmts) : null),
+    () => (active("pii_allowlist") ? checkPiiFieldAllowlist(op, stmts, policy.piiFields) : null),
     () => (active("fs_scope") ? checkFsScope(op, ctx.scope, ctx.readOnly) : null),
     () => (active("http_mock") ? checkHttpRedirect(op, ctx.knownMocks) : null),
   ];

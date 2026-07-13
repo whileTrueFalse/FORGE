@@ -122,7 +122,7 @@ Tracked in the session task list. Priority order:
 | 7 | CI workflow (tsc + tests on push/PR) | infra — do first (guards the rest) | ✅ done |
 | 1 | Intercept `fetch`/undici outbound HTTP | 🔴 beta-gate | ✅ done |
 | 2 | Harden DB connection rerouting to sandbox | 🔴 beta-gate | ✅ done |
-| 3 | Harden SQL parsing in the policy path | 🟠 beta-gate | pending |
+| 3 | Harden SQL parsing in the policy path | 🟠 beta-gate | ✅ done |
 | 4 | Tests for free-flow runs + mode toggle | 🟡 lock-in | pending |
 | 5 | Document free-flow model + `forge mode` | 🟡 lock-in | pending |
 | 6 | Apply Ember theme to GuideView + Dashboard | 🟢 polish | pending |
@@ -164,4 +164,10 @@ Tracked in the session task list. Priority order:
   **Residual gap (containment, out of scope):** covers CJS `require('pg')` + `new`
   construction; a raw `net.connect` to a prod DB port, a non-`pg` driver, or ESM
   live-binding edge cases still bypass — that's the in-process-patch limitation, not a
-  connection-rerouting bug. Next: #3 (SQL parsing hardening).
+  connection-rerouting bug.
+- **Task #3 done:** `core/sqlNormalize.ts` (strip comments, blank string-literal
+  contents, split statements) + refactored the policy SQL rules to match on the
+  normalized, per-statement form. Closes: comment-hidden `SELECT *`, `DROP` split by a
+  comment, unscoped mutation hidden after a `;` (now blocked as a multi-statement batch),
+  and `WHERE` faked inside a string literal. +8 tests, 65 pass. All 🔴/🟠 correctness
+  beta-gates now done. Next: #4 (free-flow tests) / #5 (docs).

@@ -94,6 +94,37 @@ test("rule 6: known third-party host redirects to mock; unknown host blocks", ()
   assert.match(blocked.reason ?? "", /no mock registered/i);
 });
 
+// ── evasion hardening (task #3) ────────────────────────────────────
+
+test("hardening: comment-hidden wildcard SELECT is still blocked", () => {
+  const v = evaluateOperation(dbOp("SELECT /* sneaky */ * FROM users"), resolvedDefault, ctx);
+  assert.equal(v.verdict, "block");
+  assert.match(v.reason ?? "", /wildcard/i);
+});
+
+test("hardening: unscoped mutation hidden after a ; is blocked", () => {
+  const v = evaluateOperation(dbOp("SELECT id FROM orders WHERE user_id = ?; UPDATE users SET admin = 1"), resolvedDefault, ctx);
+  assert.equal(v.verdict, "block");
+  assert.match(v.reason ?? "", /multi-statement/i);
+});
+
+test("hardening: WHERE hidden in a string literal does not satisfy the guard", () => {
+  const v = evaluateOperation(dbOp("UPDATE users SET note = 'where it counts'"), resolvedDefault, ctx);
+  assert.equal(v.verdict, "rewrite");
+  assert.match(v.reason ?? "", /missing WHERE clause/i);
+});
+
+test("hardening: comment-split DROP TABLE is still destructive", () => {
+  const v = evaluateOperation(dbOp("SELECT 1; DROP/* */TABLE users"), resolvedDefault, ctx);
+  assert.equal(v.verdict, "block");
+  assert.match(v.reason ?? "", /destructive/i);
+});
+
+test("hardening: a genuinely scoped UPDATE with a trailing comment still passes", () => {
+  const v = evaluateOperation(dbOp("UPDATE orders SET status = ? WHERE id = ? -- ok"), resolvedDefault, ctx);
+  assert.equal(v.verdict, "pass");
+});
+
 test("resolvePolicyRules: preset → active rules + on_block", () => {
   assert.deepEqual(resolvedDefault.activeRules.includes("pii_allowlist"), false);
   assert.deepEqual(resolvedStrict.activeRules.includes("pii_allowlist"), true);
