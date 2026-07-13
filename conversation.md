@@ -123,7 +123,7 @@ Tracked in the session task list. Priority order:
 | 1 | Intercept `fetch`/undici outbound HTTP | 🔴 beta-gate | ✅ done |
 | 2 | Harden DB connection rerouting to sandbox | 🔴 beta-gate | ✅ done |
 | 3 | Harden SQL parsing in the policy path | 🟠 beta-gate | ✅ done |
-| 4 | Tests for free-flow runs + mode toggle | 🟡 lock-in | pending |
+| 4 | Tests for free-flow runs + mode toggle | 🟡 lock-in | ✅ done |
 | 5 | Document free-flow model + `forge mode` | 🟡 lock-in | pending |
 | 6 | Apply Ember theme to GuideView + Dashboard | 🟢 polish | pending |
 
@@ -170,4 +170,8 @@ Tracked in the session task list. Priority order:
   normalized, per-statement form. Closes: comment-hidden `SELECT *`, `DROP` split by a
   comment, unscoped mutation hidden after a `;` (now blocked as a multi-statement batch),
   and `WHERE` faked inside a string literal. +8 tests, 65 pass. All 🔴/🟠 correctness
-  beta-gates now done. Next: #4 (free-flow tests) / #5 (docs).
+  beta-gates now done.
+- **Task #4 done:** tests for free-flow — `freeFlow.test.ts` (default agent shape),
+  `commands/run.test.ts` (scripted run with agents:[] completes + records a run, no
+  error), `shell/registry.test.ts` (`forge mode` free/guided persists in state.json,
+  show, bad-value rejected). 68 pass. Next: #5 (docs) / #6 (Ember polish).
