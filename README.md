@@ -1,5 +1,7 @@
 # Forge
 
+[![CI](https://github.com/whileTrueFalse/FORGE/actions/workflows/ci.yml/badge.svg)](https://github.com/whileTrueFalse/FORGE/actions/workflows/ci.yml)
+
 > A terminal-based sandbox engine that sits between an AI coding agent and the
 > real world — so an agent's code can run against a **simulated** company
 > (synthetic database, mock APIs, scoped filesystem) instead of production,
