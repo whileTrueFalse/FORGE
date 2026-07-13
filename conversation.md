@@ -125,7 +125,7 @@ Tracked in the session task list. Priority order:
 | 3 | Harden SQL parsing in the policy path | 🟠 beta-gate | ✅ done |
 | 4 | Tests for free-flow runs + mode toggle | 🟡 lock-in | ✅ done |
 | 5 | Document free-flow model + `forge mode` | 🟡 lock-in | ✅ done |
-| 6 | Apply Ember theme to GuideView + Dashboard | 🟢 polish | pending |
+| 6 | Apply Ember theme to GuideView + Dashboard | 🟢 polish | ✅ done |
 
 **Agreed sequence:** #7 → #1 → #2 → #3 → #4/#5 → #6.
 
@@ -178,4 +178,14 @@ Tracked in the session task list. Priority order:
 - **Task #5 done:** documented free-flow — README (free-flow callout + `forge mode` in
   the command table), in-shell tour (`Tour.tsx` new "Running it (free-flow)" step), and
   `docs/05-CLI-UX-SPEC.md` (new "Free-flow & shell modes" section + softened `init` hint).
-  68 pass. Only #6 (Ember polish) left.
+  68 pass.
+- **Task #6 done:** GuideView/Tour were already Ember (they render through the shared
+  `Panel`, which uses `theme = palette` + single borders + uppercased titles). Aligned
+  the Dashboard's two `borderStyle="round"` boxes to `single` — all borders now
+  single/edge across tui + shell. 68 pass.
+
+### ✅ All 7 backlog tasks complete (2026-07-13). 68 tests green, tsc clean, all pushed to main.
+The 🔴/🟠 correctness beta-gates (fetch, DB reroute, SQL hardening) + CI + free-flow
+tests/docs + Ember polish are done. **Next frontier is post-beta / GA** (see section 5):
+true containment boundary, multi-runtime/multi-DB coverage, hosted CI/team layer, auth,
+threat-model doc, npm publish + releases. None started — pick up from section 5's cut-line.

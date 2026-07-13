@@ -53,7 +53,7 @@ export function Dashboard(props: DashboardProps): React.JSX.Element {
     <Box flexDirection="column">
       {/* Status strip */}
       <Box
-        borderStyle="round"
+        borderStyle="single"
         borderColor={theme.accent}
         paddingX={1}
         justifyContent="space-between"
@@ -185,7 +185,7 @@ export function Dashboard(props: DashboardProps): React.JSX.Element {
 
       {/* Done banner */}
       {phase === "done" ? (
-        <Box borderStyle="round" borderColor={eligible ? theme.pass : theme.warn} paddingX={1} flexDirection="column">
+        <Box borderStyle="single" borderColor={eligible ? theme.pass : theme.warn} paddingX={1} flexDirection="column">
           <Text>
             <Text color={eligible ? theme.pass : theme.warn} bold>
               {eligible ? "● RUN COMPLETE — eligible to approve" : "● RUN COMPLETE — requires attention"}
