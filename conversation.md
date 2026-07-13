@@ -124,7 +124,7 @@ Tracked in the session task list. Priority order:
 | 2 | Harden DB connection rerouting to sandbox | 🔴 beta-gate | ✅ done |
 | 3 | Harden SQL parsing in the policy path | 🟠 beta-gate | ✅ done |
 | 4 | Tests for free-flow runs + mode toggle | 🟡 lock-in | ✅ done |
-| 5 | Document free-flow model + `forge mode` | 🟡 lock-in | pending |
+| 5 | Document free-flow model + `forge mode` | 🟡 lock-in | ✅ done |
 | 6 | Apply Ember theme to GuideView + Dashboard | 🟢 polish | pending |
 
 **Agreed sequence:** #7 → #1 → #2 → #3 → #4/#5 → #6.
@@ -174,4 +174,8 @@ Tracked in the session task list. Priority order:
 - **Task #4 done:** tests for free-flow — `freeFlow.test.ts` (default agent shape),
   `commands/run.test.ts` (scripted run with agents:[] completes + records a run, no
   error), `shell/registry.test.ts` (`forge mode` free/guided persists in state.json,
-  show, bad-value rejected). 68 pass. Next: #5 (docs) / #6 (Ember polish).
+  show, bad-value rejected). 68 pass.
+- **Task #5 done:** documented free-flow — README (free-flow callout + `forge mode` in
+  the command table), in-shell tour (`Tour.tsx` new "Running it (free-flow)" step), and
+  `docs/05-CLI-UX-SPEC.md` (new "Free-flow & shell modes" section + softened `init` hint).
+  68 pass. Only #6 (Ember polish) left.

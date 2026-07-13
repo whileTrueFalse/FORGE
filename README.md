@@ -85,6 +85,18 @@ forge report run-1
 forge approve run-1
 ```
 
+**Free-flow is the default: every step above except `forge init` is optional.**
+Run anything in the sandbox immediately — the DB, mocks, and write scope all
+default — and wire connectors only if/when you want them, in any order:
+
+```bash
+forge init acme-checkout
+forge box "npm test"     # runs in the sandbox now — no db link / mock / attach needed
+```
+
+In the interactive shell, `forge mode guided` keeps the setup checklist and
+next-step hints; `forge mode free` hides them for full control.
+
 > **Requirements:** Node.js 20.6+ (uses `--import`). **No Docker needed** — the
 > real engine defaults to an in-process Postgres (pglite); Docker is optional
 > (`--real --db docker`) for closest-to-prod concurrency.
@@ -308,6 +320,7 @@ active rule set via `resolvePolicyRules`.
 | `forge target set <start> --port <n>` | configure the app for `--real` runs |
 | `forge run [--real] [--task …] [--policy …]` | run the sandbox (scripted or real) |
 | `forge box <command>` / `forge run --exec <command>` | run **any command** inside the isolated box |
+| `forge mode [guided\|free]` | toggle the shell's setup checklist (guided) vs full control (free) |
 | `forge diff <run-id>` | show a run's code diff |
 | `forge report <run-id>` | render a run's full report |
 | `forge approve <run-id> [--force]` | approve a run (gated by pass rate) |

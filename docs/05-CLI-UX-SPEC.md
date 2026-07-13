@@ -19,6 +19,35 @@ tone** should match.
   lines) using a `sleep(ms)` helper — except when output is piped/non-TTY,
   in which case skip delays entirely (check `process.stdout.isTTY`).
 
+## Free-flow & shell modes
+
+Forge does not force a setup wizard. The only required step is `forge init`;
+`db link`, `mock add`, `sim add`, and `attach` are **optional** and may be run
+in any order. A run needs no attached agent — when none is present Forge uses a
+full-scope (`**`) default so nothing blocks the run. The one guardrail that
+stays is inherent: `forge run --real` needs a `target` app to drive.
+
+The zero-setup entry point is the box:
+
+```
+$ forge init acme-checkout
+$ forge box "npm test"        # runs sandboxed immediately — no db/mock/attach
+```
+
+The interactive shell has two modes, toggled with `forge mode`:
+
+```
+$ forge mode              # show the current mode
+mode: guided
+  guided — setup checklist + next-step hints on the left
+
+$ forge mode free         # hide the checklist for full control
+✓ mode → free
+```
+
+`guided` (default) shows the setup checklist and next-step hints; `free` hides
+them. The choice persists per project in `.forge/state.json` (`shellMode`).
+
 ## `forge init`
 
 ```
@@ -31,7 +60,7 @@ $ forge init
 ✓ forge.yaml created
 ✓ .forge/ directory scaffolded
 
-next: connect your data sources with `forge db link`
+run anything now: forge box "<command>"  ·  or wire connectors: forge db link
 ```
 
 ## `forge db link`

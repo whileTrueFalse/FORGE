@@ -21,6 +21,16 @@ export const TOUR_STEPS: TourStep[] = [
     ],
   },
   {
+    title: "Running it  (free-flow)",
+    body: [
+      'No fixed setup. `forge box "<command>"` runs anything in the',
+      "sandbox right after `forge init` — database, mocks, and write",
+      "scope all default. Add connectors only if you want them, in any",
+      "order: forge db link · forge mock add · forge attach.",
+      "Want the checklist? `forge mode guided`. Out of the way? `forge mode free`.",
+    ],
+  },
+  {
     title: "Connectors  (left)",
     body: [
       "Shows what the sandbox stands in for: a synthetic DB seeded from",
