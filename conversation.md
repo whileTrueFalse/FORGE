@@ -184,6 +184,15 @@ Tracked in the session task list. Priority order:
   the Dashboard's two `borderStyle="round"` boxes to `single` — all borders now
   single/edge across tui + shell. 68 pass.
 
+- **CI red on first run — fixed:** run #1 failed on every job except windows+node22.
+  Root cause: the test script used `node --test "src/**/*.test.ts"`, but `--test` glob
+  patterns are Node 21+ only — on Node 20 node treats it as a literal path and exits 1
+  (and node22's glob may match nothing on linux). Replaced with `scripts/test.mjs` — a
+  portable runner that discovers `*.test.ts(x)` via fs and passes explicit paths to
+  `node --import tsx --test`. Works on Node 20+ and every OS. 68 pass locally. If a job
+  is still red after this, it's a genuine per-OS test failure — get the log from the
+  Actions tab (gh can't read it: work account, private repo).
+
 ### ✅ All 7 backlog tasks complete (2026-07-13). 68 tests green, tsc clean, all pushed to main.
 The 🔴/🟠 correctness beta-gates (fetch, DB reroute, SQL hardening) + CI + free-flow
 tests/docs + Ember polish are done. **Next frontier is post-beta / GA** (see section 5):
