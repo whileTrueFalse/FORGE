@@ -4,7 +4,7 @@
 > It captures what Forge is, its **real** (not aspirational) state, decisions made,
 > and the task backlog. Update the Session Log at the bottom as work lands.
 
-Last updated: **2026-07-13**
+Last updated: **2026-07-14**
 
 ---
 
@@ -141,6 +141,66 @@ Tracked in the session task list. Priority order:
 ---
 
 ## 8. Session log
+
+### 2026-07-14 — new thread: accounts, auth, and payments (invite-only alpha)
+
+Pivoted from beta-readiness hardening to making Forge a real, eventually-paying
+product. **Decided:** the CLI stays 100% local (sandbox/policy engine never
+executes anything server-side — rebuilding that as a hosted executor would
+reopen every containment gap above). What's added is an **account +
+entitlement layer**: `npm install -g forge` + a separate small backend for
+identity/billing only. Alpha is invite-only via a server-side GitHub-username
+allowlist (not invite codes — simplest thing for a small known group).
+Full plan: `C:\Users\Samarth\.claude\plans\linked-crunching-truffle.md`.
+
+**New sibling repo: `E:\SANDTEST\forge-backend`** (not yet pushed — no GitHub
+remote created yet, that's a user decision). Fastify + Postgres, identity/
+billing ONLY, never executes user code or touches project files. Local git,
+`whileTrueFalse` identity, 2 commits:
+- Skeleton: schema (`users`, `allowlist`, `cli_tokens`, `subscriptions`,
+  `processed_webhook_events`), migration runner, `/health`, CI (node 20/22 +
+  real `postgres:16` service container + `npm audit`), README with manual
+  deploy steps (Neon/Supabase + Render/Fly — need the user's real accounts).
+  Verified end-to-end locally via `@electric-sql/pglite` (no Docker needed —
+  same trick forge-prototype's own pglite backend uses).
+- Auth: **design refinement over the original plan** — `forge login` drives
+  **GitHub's own OAuth Device Flow** (`github.com/login/device`) directly
+  instead of reimplementing RFC 8628 ourselves. Dropped the `device_auth`
+  table and the website "enter code" page entirely — unnecessary once GitHub
+  does that part. `POST /auth/exchange` is the only endpoint that trusts a
+  client: takes a GitHub access token, re-verifies identity itself
+  (`GET api.github.com/user`), checks the allowlist (closes task #10 — same
+  gate, different name since there's no "callback" in this design), mints an
+  opaque `cli_token` (only its SHA-256 hash persisted). `GET /me` /
+  `POST /auth/logout` round out the session. 6 tests, real pglite-backed
+  route tests via Fastify `inject()`.
+
+**forge-prototype additions:** `forge login` / `whoami` / `logout` commands,
+`core/userConfig.ts` (new `~/.forge/credentials.json` home-dir store —
+deliberately separate from `store.ts`'s project-local `.forge/`),
+`core/accountsConfig.ts` (public API URL + GitHub client_id, not secrets).
+11 new tests. Pushed (`9b8523f`).
+
+**Bug caught and fixed via manual smoke test** (not just automated tests):
+`forge whoami` printed leaked fake test data ("old-login · pro tier") — two
+tests' home-dir isolation helper did `return fn()` instead of
+`return await fn()`, so `finally` restored the REAL `HOME`/`USERPROFILE`
+before the async test body ran. It briefly wrote fake credentials into the
+real `~/.forge/` before a later smoke-test command incidentally cleared it.
+Fixed (properly awaited) + strengthened with an assertion that the
+credentials file actually lands under the fake home. Confirmed real
+`~/.forge/` is clean. **Lesson: run a real manual smoke test even when
+automated tests pass — this bug was invisible to the tests themselves,
+only visible by actually running the CLI.**
+
+**Still needs the user's real accounts to go further:** a GitHub OAuth App
+(device flow enabled), Stripe test-mode keys, and eventually Neon/Supabase +
+Render/Fly for a real deployed staging environment. Nothing further can be
+end-to-end verified against a live backend until those exist.
+
+Remaining build order: #11 website auth pages (`/login`, `/dashboard` — no
+`/device` page needed anymore, see above), #12 Stripe (`forge upgrade`),
+#13 security hardening pass + `SECURITY.md`, #14 full e2e verification.
 
 ### 2026-07-13
 - Website sharing: built `share.ps1` (serve static site + ngrok public URL, one
