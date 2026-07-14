@@ -203,7 +203,10 @@ Tracked in the session task list. Priority order:
   post-action frame instead of sleeping. 68/68, Shell tests stable ×3 locally. (Docker
   Desktop too flaky here to run the throttled-CPU confirmation; fix is principled.)
 
-### ✅ All 7 backlog tasks complete (2026-07-13). 68 tests green, tsc clean, all pushed to main.
+- **CI GREEN (run #9, commit 1cbbeec):** all 4 matrix jobs (ubuntu/windows × node 20/22)
+  passed in ~1m5s. The two-stage fix (portable runner + waitFor-based TUI tests) worked.
+
+### ✅ All 7 backlog tasks complete (2026-07-13). 68 tests green, tsc clean, CI green, all pushed to main.
 The 🔴/🟠 correctness beta-gates (fetch, DB reroute, SQL hardening) + CI + free-flow
 tests/docs + Ember polish are done. **Next frontier is post-beta / GA** (see section 5):
 true containment boundary, multi-runtime/multi-DB coverage, hosted CI/team layer, auth,
