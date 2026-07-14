@@ -17,6 +17,9 @@ import { approve } from "./commands/approve.js";
 import { connect, disconnect } from "./commands/connect.js";
 import { targetSet, targetShow } from "./commands/target.js";
 import { policyShow, policyList, policySet } from "./commands/policy.js";
+import { login } from "./commands/login.js";
+import { whoami } from "./commands/whoami.js";
+import { logout } from "./commands/logout.js";
 import { launchShell } from "./shell/launch.js";
 
 const program = new Command();
@@ -156,6 +159,21 @@ program
   .description("Disconnect an external integration")
   .argument("<provider>", "e.g. github")
   .action(disconnect);
+
+program
+  .command("login")
+  .description("Sign in to Forge with GitHub")
+  .action(login);
+
+program
+  .command("whoami")
+  .description("Show the signed-in account and entitlement tier")
+  .action(whoami);
+
+program
+  .command("logout")
+  .description("Sign out of Forge")
+  .action(logout);
 
 program.parseAsync(process.argv).catch((err) => {
   console.error(err);
