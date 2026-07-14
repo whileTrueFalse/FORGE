@@ -192,6 +192,16 @@ Tracked in the session task list. Priority order:
   `node --import tsx --test`. Works on Node 20+ and every OS. 68 pass locally. If a job
   is still red after this, it's a genuine per-OS test failure — get the log from the
   Actions tab (gh can't read it: work account, private repo).
+- **CI still red (run #8) — TUI test flakiness fixed:** portable runner fixed node20, but
+  the pass/fail set *reshuffled* (only win-node20 passed) — proof of nondeterminism. Cause:
+  the Ink TUI tests (`Shell.test.tsx`, `App.test.tsx`) asserted on rendered frames after
+  fixed `delay()`s, which race on slow/shared GitHub runners. A clean Linux+node22 Docker
+  run passed 68/68 (fast machine), confirming it's timing, not a real bug. Fix: added
+  `src/testWait.ts` (`waitFor` poll helper) and rewrote both TUI test files to (a) settle
+  briefly so Ink attaches/re-subscribes its `useInput` handler before a keypress — pressing
+  Enter too early hits a stale closure and the command never runs — and (b) poll for the
+  post-action frame instead of sleeping. 68/68, Shell tests stable ×3 locally. (Docker
+  Desktop too flaky here to run the throttled-CPU confirmation; fix is principled.)
 
 ### ✅ All 7 backlog tasks complete (2026-07-13). 68 tests green, tsc clean, all pushed to main.
 The 🔴/🟠 correctness beta-gates (fetch, DB reroute, SQL hardening) + CI + free-flow

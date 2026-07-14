@@ -7,6 +7,7 @@ import assert from "node:assert/strict";
 import { render } from "ink-testing-library";
 import { App } from "./App.js";
 import { RunEngine } from "../core/runEngine.js";
+import { waitFor } from "../testWait.js";
 import type { ForgeConfig } from "../types.js";
 
 function buildConfig(): ForgeConfig {
@@ -44,38 +45,30 @@ function buildConfig(): ForgeConfig {
 }
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const has = (lastFrame: () => string | undefined, ...res: RegExp[]) => {
+  const f = lastFrame() ?? "";
+  return res.every((re) => re.test(f));
+};
 
-test("TUI: welcome screen mounts with branding and session overview", () => {
+test("TUI: welcome screen mounts with branding and session overview", async () => {
   const config = buildConfig();
   const engine = new RunEngine({ runId: "run-1", task: "add coupon validation", agent: config.agents[0], config, exitOnBlock: false });
   const { lastFrame, unmount } = render(<App engine={engine} config={config} task="add coupon validation" />);
-  const frame = lastFrame() ?? "";
-  assert.match(frame, /this session/i);
-  assert.match(frame, /how a run works/i);
-  assert.match(frame, /start run/); // key hint
+  await waitFor(() => has(lastFrame, /this session/i, /how a run works/i, /start run/));
   unmount();
 });
 
 test("TUI: pressing enter starts the run and drives it to completion", async () => {
   const config = buildConfig();
   const engine = new RunEngine({ runId: "run-1", task: "t", agent: config.agents[0], config, exitOnBlock: false });
-  let resolveDone: () => void;
-  const donePromise = new Promise<void>((r) => (resolveDone = r));
-  engine.once("done", () => resolveDone());
   const { lastFrame, stdin, unmount } = render(<App engine={engine} config={config} task="t" />);
 
-  await delay(30);
+  await waitFor(() => has(lastFrame, /start run/)); // welcome mounted
+  await delay(50); // let Ink attach the input handler before sending Enter
   stdin.write("\r"); // Enter → start run
 
-  // Await the run's completion directly (sleeps no-op under non-TTY stdout),
-  // with a generous safety timeout so a cold start can't flake the poll budget.
-  let timedOut = false;
-  await Promise.race([donePromise, delay(4000).then(() => (timedOut = true))]);
-  await delay(20); // let the final frame render
-
-  assert.equal(timedOut, false);
-  const frame = lastFrame() ?? "";
-  assert.match(frame, /RUN COMPLETE/);
-  assert.match(frame, /live policy log/i);
+  // Poll until the run has driven to completion + the final frame rendered,
+  // rather than sleeping a fixed budget (which races on slow CI runners).
+  await waitFor(() => has(lastFrame, /RUN COMPLETE/, /live policy log/i), { timeout: 15000 });
   unmount();
 });
