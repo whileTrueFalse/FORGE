@@ -4,7 +4,7 @@
 > It captures what Forge is, its **real** (not aspirational) state, decisions made,
 > and the task backlog. Update the Session Log at the bottom as work lands.
 
-Last updated: **2026-07-14**
+Last updated: **2026-07-15**
 
 ---
 
@@ -201,6 +201,82 @@ end-to-end verified against a live backend until those exist.
 Remaining build order: #11 website auth pages (`/login`, `/dashboard` — no
 `/device` page needed anymore, see above), #12 Stripe (`forge upgrade`),
 #13 security hardening pass + `SECURITY.md`, #14 full e2e verification.
+
+### 2026-07-15 — website rebuild (Astro) + web login/dashboard (task #11 done)
+
+**Website completely rebuilt** at `E:\SANDTEST\frontend\forge-website` as an
+Astro project (was a hand-rolled single-file HTML + custom-DSL site, never
+version-controlled — now a real git repo, `whileTrueFalse` identity, first
+commit `714d531`). Old site preserved at `forge-website-old/`, not deployed.
+Design went through several corrective iterations (user feedback each time):
+1. First pass: too generic/terminal-only, unsatisfying.
+2. Overcorrected to violet/cyan gradients + glassmorphism — user correctly
+   called this "vibecoded/AI-generated" (it's become the exact tell every
+   codegen tool defaults to).
+3. Corrected to one restrained accent (**amber** — kept deliberately, tied to
+   "Forge" → forging → ember, not chosen for trend) + crisp hairline borders
+   + a subtle grain texture. User: "basic and average" — restraint had
+   overshot into empty; craft ≠ absence of features.
+4. Added back a **real interactive hero terminal** (typeable, tab-completes,
+   executes commands — verified with actually-dispatched keyboard events, not
+   just visual read), cursor spotlight + 3D tilt, an interception-flow SVG
+   diagram (visualizes the real mechanism), true stat counters (4 interceptors,
+   6 policy rules, 0 telemetry, 100% sandboxed — real numbers, not invented),
+   choreographed hero entrance, focus-visible states, copy-button micro-interaction.
+   User: "looks good for now, product is initial."
+- **Notable debugging finding**: this session's browser-automation tab
+  reports `document.visibilityState: "hidden"` permanently — Chromium
+  suspends `IntersectionObserver` *and* `requestAnimationFrame` for
+  backgrounded tabs, which explained every screenshot hang and "animation
+  isn't working" result all session. Not a site bug — proved via direct
+  event dispatch (terminal exec logic) and real running-backend network
+  traces instead of relying on screenshots. Added a `visibilitychange`
+  listener anyway since it's the textbook-correct fix for real Chrome
+  speculative-prerendering (pages legitimately load hidden there).
+
+**Task #11 (website auth) done**, with a scope simplification: no `/device`
+page (per the earlier device-flow design refinement) and — new insight —
+`forge upgrade` doesn't need a website login at all, since the CLI's existing
+session token can drive `/billing/checkout` directly and open the resulting
+Stripe URL in a browser. Website `/login`+`/dashboard` were still built
+(user's call) as an optional browser account surface, not a functional
+requirement.
+- **Backend**: standard OAuth Authorization Code flow (confidential client —
+  exchange uses the client secret server-side, no PKCE needed) distinct from
+  the CLI's device flow. Session = signed JWT in an httpOnly/secure/
+  sameSite=lax cookie, 7-day TTL (refresh-token rotation deferred to task #13
+  — proportionate to the alpha's small trusted user base). Extracted
+  `src/lib/identity.ts` (allowlist check + user upsert) so the CLI and web
+  paths share one allowlist gate that can't drift. New: `GET /auth/web/login`
+  (state-cookie CSRF, redirect to GitHub), `GET /auth/web/callback`,
+  `GET /auth/web/session`, `POST /auth/web/logout`. 11/11 backend tests pass
+  (was 6 — added CSRF-state, allowlist-rejection, full login→session→logout,
+  tampered-cookie cases).
+- **Website**: `/login` (Sign in with GitHub button) and `/dashboard`
+  (session check, tier display, billing button pre-wired for task #12 —
+  degrades gracefully to "billing isn't live yet" until Stripe lands).
+- **Verified for real**, not just unit-tested: ran the actual backend
+  (`scripts/dev-server.mts` — real server + pglite + seeded allowlist entry)
+  and the actual website together. Confirmed via live network trace:
+  unauthenticated `/dashboard` → real `401` from the real backend → correct
+  redirect to `/login`; clicking "Sign in with GitHub" → real redirect
+  through the backend → actual `github.com/login` page with the exact right
+  `redirect_uri`, `state` (CSRF token), and `scope=read:user`. Everything up
+  to "needs your real GitHub OAuth App" is proven working.
+- **Production note added** to backend README: the session cookie is
+  `SameSite=Lax`, so website + backend must share a registrable domain in
+  prod (subdomains fine, e.g. `forge.dev` + `api.forge.dev`) — works on
+  `localhost` regardless of port, which is why this wasn't caught by dev
+  testing alone.
+
+**Still blocked on the user:** GitHub OAuth App creation (client_id/secret +
+"Enable Device Flow" checked) — asked twice now, not done yet. Full e2e
+verification (task #14) needs it.
+
+Next: #12 Stripe integration (`forge upgrade`, checkout, webhook, portal —
+this also makes the dashboard's billing button actually work), #13 security
+hardening + `SECURITY.md`, #14 full e2e verification (blocked on the OAuth
+App above).
 
 ### 2026-07-13
 - Website sharing: built `share.ps1` (serve static site + ngrok public URL, one
