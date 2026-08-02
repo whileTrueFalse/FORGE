@@ -1,21 +1,47 @@
 {
-  "name": "forge-prototype",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "@whiletruefalse/forge",
+  "version": "0.1.0",
+  "description": "The execution boundary between your AI coding agent and production — sandbox, intercept, and review every operation before it's real.",
   "type": "module",
   "bin": {
     "forge": "./bin/forge.js"
   },
+  "files": [
+    "dist",
+    "bin"
+  ],
+  "engines": {
+    "node": ">=20.6.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/whileTrueFalse/FORGE.git"
+  },
+  "homepage": "https://github.com/whileTrueFalse/FORGE#readme",
+  "bugs": {
+    "url": "https://github.com/whileTrueFalse/FORGE/issues"
+  },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && node scripts/clean-dist-tests.mjs",
     "forge": "tsx src/cli.ts",
     "test": "node scripts/test.mjs",
-    "prepare": "npm run build"
+    "prepare": "npm run build",
+    "prepublishOnly": "npm test && npm run build"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "ai-agent",
+    "coding-agent",
+    "sandbox",
+    "cli",
+    "security",
+    "policy-engine",
+    "developer-tools"
+  ],
+  "author": "whileTrueFalse",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.3",
     "@electric-sql/pglite-socket": "^0.2.6",

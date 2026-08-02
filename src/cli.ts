@@ -2,6 +2,7 @@
 // Forge CLI entrypoint. Registers all commands with commander.
 // See docs/05-CLI-UX-SPEC.md for exact expected output per command.
 
+import { createRequire } from "node:module";
 import { Command } from "commander";
 import { init } from "./commands/init.js";
 import { dbLink, dbStatus } from "./commands/db.js";
@@ -22,12 +23,18 @@ import { whoami } from "./commands/whoami.js";
 import { logout } from "./commands/logout.js";
 import { launchShell } from "./shell/launch.js";
 
+// Read the version from package.json rather than hardcoding it a second
+// place -- a mismatch between `forge --version` and the published npm
+// version is exactly the kind of thing that confuses a bug report.
+const require = createRequire(import.meta.url);
+const { version } = require("../package.json") as { version: string };
+
 const program = new Command();
 
 program
   .name("forge")
   .description("A terminal-based sandbox engine for AI coding agents")
-  .version("0.1.0-prototype");
+  .version(version);
 
 // Bare `forge` (no subcommand) launches the interactive shell.
 program.action(async () => {
@@ -37,11 +44,12 @@ program.action(async () => {
 program
   .command("init")
   .description("Scaffold forge.yaml for this project")
+  .argument("[name]", "project name (or use --name)")
   .option("--name <name>", "project name")
   .option("--stack <stack>", "stack label")
   .option("--policy <preset>", "policy preset (default|strict)")
   .option("--force", "overwrite an existing forge.yaml")
-  .action(init);
+  .action((name, options) => init({ ...options, name: name ?? options.name }));
 
 const db = program.command("db").description("Manage database connectors");
 db.command("link")
@@ -113,6 +121,14 @@ program
   .option("--sample <n>", "sampled sessions per simulation for real runs")
   .option("--exit-on-block", "exit with non-zero code if a block goes unresolved")
   .action(run);
+
+program
+  .command("box")
+  .description('Run ANY command inside the sandbox box, no setup required (shorthand for `run --exec`)')
+  .argument("<command...>", 'the command to run, e.g. forge box "npm test"')
+  .option("--db <backend>", "sandbox DB: pglite (default, no Docker) | docker")
+  .option("--exit-on-block", "exit with non-zero code if a block goes unresolved")
+  .action((command, options) => run({ ...options, exec: command.join(" ") }));
 
 program
   .command("tui")
