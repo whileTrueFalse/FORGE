@@ -4,7 +4,7 @@
 > It captures what Forge is, its **real** (not aspirational) state, decisions made,
 > and the task backlog. Update the Session Log at the bottom as work lands.
 
-Last updated: **2026-07-15**
+Last updated: **2026-08-11**
 
 ---
 
@@ -164,6 +164,69 @@ Tracked in the session task list. Priority order:
 ---
 
 ## 8. Session log
+
+### 2026-08-02/11 — npm publish readiness + real GitHub OAuth verification (milestone)
+
+**npm publish readiness (task-adjacent, forge-prototype):** package.json was
+never actually publishable (`forge-prototype` v1.0.0, ISC, no `files`
+allowlist — would have shipped `conversation.md` and 745KB of `examples/`).
+Fixed: name `@whiletruefalse/forge`, version `0.1.0`, MIT + LICENSE,
+`"files": ["dist","bin"]`, `engines`, `publishConfig.access=public`,
+`prepublishOnly` runs tests. `--version` now reads package.json instead of a
+hardcoded string that had already drifted. Found via an actual `npm pack` +
+isolated global-install smoke test (not just trusting config) — caught 3 real
+bugs: compiled test files leaking into dist (tsconfig `exclude` broke tsx's
+JSX transform for `.test.tsx` files when tried; fixed via a post-build
+`scripts/clean-dist-tests.mjs` instead, which only touches build output),
+`forge box` not existing as a one-shot CLI command at all (shell-only,
+despite being the documented flagship entry point everywhere — added as
+`run --exec` shorthand), and `forge init <name>` positional form never being
+wired up (only `--name` worked, despite the code's own comment saying
+otherwise). All verified via a real packed-tarball global install, not
+assumed. **`npm publish` itself intentionally not done — needs the user's
+npm login.**
+
+**Git push was fully broken all session — real root cause found and fixed.**
+Every push (mine via tools, and the user's own) failed with `remote: Invalid
+username or token`. Spent significant effort clearing Windows Credential
+Manager / GCM caches (`cmdkey`, `git credential reject`) -- **none of that
+was the actual cause**. Real cause: `C:/Users/Samarth/.gitconfig` (global)
+overrides the credential helper for `github.com` specifically to delegate to
+`gh auth git-credential` -- so every push used whatever account `gh` was
+logged into, which was the **work account** (`samarth-winbold-dev`) the
+entire time; `whileTrueFalse` had never been logged into `gh` on this
+machine. Fixed: `gh auth login` -> browser -> sign in as `whileTrueFalse`.
+Full detail + fix recorded in section 1a above so this isn't rediscovered.
+
+**GitHub OAuth App created** (finally, after being asked ~4 times across the
+session): `Forge (dev)`, Device Flow enabled, callback
+`http://localhost:8787/auth/web/callback`. Client ID `Ov23lifnWbTcnpzMpYke`
+(public, safe to reference); client secret handled live in-session, never
+written to any file or committed anywhere.
+
+**Milestone: the full auth loop verified against REAL GitHub, not stubs, for
+the first time this whole build.** Extended `scripts/dev-server.mts`
+(forge-backend) to accept real credentials via env var (never hardcoded/
+written to disk) and seed the real `whileTrueFalse` login into the allowlist
+instead of a placeholder. Ran the real backend (real Postgres via pglite,
+real GitHub OAuth App) and the real CLI together:
+- `forge login` -> real device code -> real GitHub approval -> real
+  backend exchange -> allowlist check -> `signed in as whileTrueFalse · free tier`.
+- `forge whoami` (live) -> `✓ whileTrueFalse · free tier`.
+- `forge whoami` (no backend reachable) -> correctly fell back to cache
+  with a `(cached — ...)` note, exactly as designed.
+- `forge logout` -> revoked server-side, cleared locally; `whoami`
+  afterward correctly says `not signed in`.
+
+This closes the one gap that had been open the entire accounts/auth thread —
+everything in `forge-backend`'s identity path is now proven against real
+infrastructure. What's NOT yet verified for real: the website's browser-based
+login (`/login` -> `/dashboard`) against this same real OAuth App (only
+proven earlier against a placeholder client_id), and Stripe (not built yet).
+
+Next: #12 Stripe integration (forge upgrade, checkout, webhook, portal),
+#13 security hardening + SECURITY.md, then a real website-login pass and
+the full e2e checklist for #14.
 
 ### 2026-07-14 — new thread: accounts, auth, and payments (invite-only alpha)
 
