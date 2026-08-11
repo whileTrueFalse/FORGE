@@ -28,6 +28,29 @@ Tagline: *"The execution boundary between your AI agent and production."*
 
 ---
 
+## 1a. Git push root cause (fixed 2026-08-02 — read this before troubleshooting push again)
+
+`git push` in this repo failed for an entire session with `remote: Invalid
+username or token` / `Authentication failed`, regardless of clearing GCM /
+Windows Credential Manager caches (`cmdkey`, `git credential reject`) — none
+of that was the actual cause. Real cause: `C:/Users/Samarth/.gitconfig`
+(global, user-level) has:
+```
+credential.https://github.com.helper=!'C:\Program Files\GitHub CLI\gh.exe' auth git-credential
+```
+This overrides the system-level GCM helper **for github.com specifically** —
+every push delegates to `gh`'s own stored login, not Windows Credential
+Manager, regardless of this repo's local `credential.username=whileTrueFalse`
+hint. `gh` was logged in as the **work account** (`samarth-winbold-dev`) only;
+`whileTrueFalse` had never been logged into `gh` on this machine at all.
+
+**Fix:** `gh auth login` → GitHub.com → HTTPS → browser login → sign in as
+`whileTrueFalse`. Then `gh auth switch --user whileTrueFalse` if it doesn't
+auto-activate. This also fixes any `gh` command (PR/issue creation), not
+just plain `git push` — same root cause. If push ever breaks again with this
+exact error, check `gh auth status` **first**, before touching credential
+caches.
+
 ## 2. Repo, environment, git identity
 
 - **Repo:** `E:\SANDTEST\forge-prototype` → GitHub `whileTrueFalse/FORGE` (branch `main`).
