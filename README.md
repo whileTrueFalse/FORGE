@@ -61,8 +61,8 @@ machine; synthetic data is generated from schema *shape*, never copied.
 ## Quick Start
 
 ```bash
-git clone <your-repo-url>
-cd forge-prototype
+git clone https://github.com/whileTrueFalse/FORGE.git
+cd FORGE
 npm install
 npm run build
 npm link        # exposes `forge` globally  (or use: npm run forge -- <args>)
@@ -238,7 +238,7 @@ seeded number.
 ## Project Structure
 
 ```
-forge-prototype/
+FORGE/
 ├── docs/                      # full spec + design package (read these first)
 │   ├── 01-PRD.md … 08-ROADMAP.md
 │   └── 09-ENGINE-ARCHITECTURE.md   # the real engine design
@@ -318,6 +318,7 @@ active rule set via `resolvePolicyRules`.
 | `forge sim add --file / --user-type` | register a simulation |
 | `forge attach <agent> --scope <glob> [--exec <cmd>]` | connect an agent/command to the box; `forge run` then runs it sandboxed |
 | `forge target set <start> --port <n>` | configure the app for `--real` runs |
+| `forge policy show / list / set <preset>` | inspect or change the active policy preset |
 | `forge run [--real] [--task …] [--policy …]` | run the sandbox (scripted or real) |
 | `forge box <command>` / `forge run --exec <command>` | run **any command** inside the isolated box |
 | `forge mode [guided\|free]` | toggle the shell's setup checklist (guided) vs full control (free) |
@@ -325,6 +326,7 @@ active rule set via `resolvePolicyRules`.
 | `forge report <run-id>` | render a run's full report |
 | `forge approve <run-id> [--force]` | approve a run (gated by pass rate) |
 | `forge connect / disconnect <provider>` | (simulated) CI/CD integration |
+| `forge login` · `forge whoami` · `forge logout` | GitHub device-flow sign-in, account + tier, sign out |
 | `forge guide` · `forge tui` | walkthrough · standalone live dashboard |
 
 [↑ Contents](#contents)
@@ -382,7 +384,7 @@ Read in order to understand the project (human or AI picking it up):
 ## Testing
 
 ```bash
-npm test        # node:test via tsx — 45 tests
+npm test        # node:test via tsx — 79 tests
 ```
 
 Coverage spans the pure policy engine, the real enforcement core (pg/http/fs
@@ -416,15 +418,16 @@ orchestrator (with fake backends), and the interactive shell + TUI (headless via
 ## Roadmap and Status
 
 **Done:** full CLI lifecycle, interactive shell, both engines, real
-pg/http/fs interception + enforcement, Docker Postgres + mock + FS sandbox, sim
-driver, orchestrator, 45 tests.
+pg/http/fs interception + enforcement, sandbox Postgres (in-process pglite by
+default, Docker optional) + mock + FS sandbox, sim driver, orchestrator, GitHub
+device-flow sign-in, 79 tests.
 
 **Next / deferred** (see [`docs/08-ROADMAP.md`](docs/08-ROADMAP.md) and
 [`docs/09`](docs/09-ENGINE-ARCHITECTURE.md)):
-- `pglite` DB backend so `--real` runs with **no Docker**
 - SQL parsing via `node-sql-parser` (replacing regex matching)
 - Hardened **container-network** mode (the app physically cannot reach prod)
-- Real GitHub/CI integration; multi-agent sessions; OS syscall interception
+- Real CI/CD integration (`forge connect` is still simulated); multi-agent
+  sessions; OS syscall interception
 
 [↑ Contents](#contents)
 
